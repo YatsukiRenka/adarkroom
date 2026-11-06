@@ -82,32 +82,70 @@ body.kotoka-narrow div#wrapper {
 	display: flex;
 	flex-direction: column;
 }
-body.kotoka-narrow div#notifications {
-	order: -1;
-	position: relative;
-	top: 0;
+body.kotoka-narrow > div#notifications {
+	position: fixed;
+	top: auto;
+	bottom: 0;
 	left: 0;
-	width: 700px;
-	height: 72px;
-	margin-bottom: 8px;
+	right: 0;
+	width: auto;
+	height: 4.6em;
+	z-index: 35;
 	overflow: hidden;
+	padding: 6px 10px 0;
+	font-size: 14px;
+	border-top: 1px solid currentColor;
 }
+body.kotoka-narrow > div#notifications div.notification { margin-bottom: 4px; }
 body.kotoka-narrow div#content { flex: none; }
 body.kotoka-narrow .eventPanel { left: 162px; top: 170px; }
 body.kotoka-narrow .eventPanel:before { left: -164px; width: 700px; }
 body.kotoka-narrow .menu {
-	position: relative;
-	right: auto;
+	position: fixed;
+	top: 0;
+	left: 0;
+	right: 0;
 	bottom: auto;
+	z-index: 40;
 	display: flex;
 	flex-wrap: wrap;
 	justify-content: center;
-	gap: 4px 16px;
 	align-items: center;
-	padding: 12px 8px 20px;
+	gap: 2px 14px;
+	padding: 6px 8px;
+	font-size: 14px;
+	border-bottom: 1px solid currentColor;
 }
-body.kotoka-narrow .menu span { float: none; margin: 0; line-height: 1.8; }
-body.kotoka-narrow .menu .customSelect { position: relative; display: inline-block; width: 120px; height: 1.8em; }
+body.kotoka-narrow .menu span { float: none; margin: 0; line-height: 1.9; }
+body.kotoka-narrow .menu .customSelect { position: relative; display: inline-block; width: 90px; height: 1.9em; }
+body.kotoka-narrow .customSelectOptions > ul { top: 0; bottom: auto; width: 90px; background: inherit; }
+body.kotoka-narrow div#saveNotify { top: auto; bottom: calc(4.6em + 16px); right: 10px; z-index: 36; }
+
+/* Stepper for rows with up/down arrows (script/kotoka/mobile.js). */
+#kotoka-stepper {
+	position: fixed;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	z-index: 45;
+	padding: 12px 16px 20px;
+	border-top: 1px solid currentColor;
+	text-align: center;
+	font-size: 18px;
+}
+#kotoka-stepper .kotoka-stepper-value { font-size: 28px; margin: 4px 0 12px; }
+#kotoka-stepper .kotoka-stepper-buttons { display: flex; justify-content: center; gap: 10px; margin-bottom: 12px; }
+#kotoka-stepper button {
+	font: inherit;
+	color: inherit;
+	background: transparent;
+	border: 1px solid currentColor;
+	min-width: 64px;
+	min-height: 48px;
+	touch-action: manipulation;
+}
+#kotoka-stepper button:disabled { opacity: 0.35; }
+#kotoka-stepper .kotoka-stepper-close { min-width: 120px; font-size: 16px; }
 @media (max-width: 600px) {
 	#kotoka-cloud-slots .kotoka-slot-row { flex-wrap: wrap; }
 	#kotoka-cloud-slots .kotoka-slot-row > .kotoka-slot-info { flex-basis: 100%; }
