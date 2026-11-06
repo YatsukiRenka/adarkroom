@@ -41,6 +41,10 @@
 				lang = localStorage.lang;
 			} catch(e) {}
 		}
+		// kotoka.club: Simplified Chinese unless another listed language was chosen
+		if(!lang || !langs[lang]){
+			lang = 'zh_cn';
+		}
 		// if a language different than english requested, load all translations
 		if(lang && lang != 'en'){
 			document.write('<script src="lang/'+lang+'/strings.js"><\/script>');
