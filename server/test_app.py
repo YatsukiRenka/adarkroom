@@ -18,8 +18,9 @@ class APITest(unittest.TestCase):
         secret = Path(self.temp_path) / 'secret'
         secret.write_text(' secret \n')
         self.env = patch.dict(os.environ, ADR_DB_PATH=str(Path(self.temp_path) / 'db'),
-                              ADR_PROXY_SECRET_FILE=str(secret), ADR_KEEP_REVISIONS='1', ADR_MAX_SLOTS='20', ADR_MAX_BODY='4096')
+                              ADR_PROXY_SECRET_FILE=str(secret), ADR_KEEP_REVISIONS='1', ADR_MAX_BODY='4096')
         self.env.start()
+        os.environ.pop('ADR_MAX_SLOTS', None)
         self.server = create_server('127.0.0.1', 0)
         self.thread = threading.Thread(target=self.server.serve_forever)
         self.thread.start()
@@ -104,9 +105,9 @@ class APITest(unittest.TestCase):
         with concurrent.futures.ThreadPoolExecutor(2) as pool:
             self.assertEqual(sorted(pool.map(write, (1, 2))), [200, 409])
 
-    def put_slot(self, slot=1, state='{}', summary=None, headers=None):
+    def put_slot(self, slot=1, state='{}', summary=None, headers=None, name='Save', **extra):
         return self.request('PUT', '/api/slots/' + str(slot),
-                            json.dumps(dict(state=state, summary={} if summary is None else summary)), headers)
+                            json.dumps(dict(state=state, summary={} if summary is None else summary, name=name, **extra)), headers)
 
     def test_slots(self):
         self.assertEqual(self.request(path='/api/slots')[1], {'slots': []})
@@ -115,21 +116,21 @@ class APITest(unittest.TestCase):
         self.assertEqual(first[1]['slot'], 1)
         self.assertTrue(first[1]['updatedAt'].endswith('Z'))
         state, summary = '{"wood":"木"}', {'wood': 123}
-        second = self.put_slot(state=state, summary=summary)
+        second = self.put_slot(state=state, summary=summary, name='New')
         self.assertEqual(second[0], 200)
         self.assertGreater(second[1]['updatedAt'], first[1]['updatedAt'])
         self.assertEqual(self.request(path='/api/slots/1')[1], dict(second[1], state=state, summary=summary))
-        self.put_slot(20)
+        self.put_slot(19)
         self.put_slot(3)
         slots = self.request(path='/api/slots')[1]['slots']
-        self.assertEqual([s['slot'] for s in slots], [1, 3, 20])
+        self.assertEqual([s['slot'] for s in slots], [1, 3, 19])
         self.assertEqual(slots[0], dict(second[1], size=len(state.encode('utf-8')), summary=summary))
         self.assertEqual(self.request('DELETE', '/api/slots/1')[:2], (200, {'slot': 1, 'deleted': True}))
         for method in ('GET', 'DELETE'):
             self.assertEqual(self.request(method, '/api/slots/1')[:2], (404, {'error': 'empty slot'}))
 
     def test_slots_invalid(self):
-        for slot in ('0', '21', 'abc', '1.5', '01x'):
+        for slot in ('0', '20', 'abc', '1.5', '01x'):
             for method in ('GET', 'PUT', 'DELETE'):
                 self.assertEqual(self.request(method, '/api/slots/' + slot)[:2], (404, {'error': 'no such slot'}))
         for summary in ({'x': '木' * 342}, [], 'text', 1):
@@ -140,7 +141,7 @@ class APITest(unittest.TestCase):
             self.assertEqual(self.request('PUT', '/api/slots/1', body)[0], 400)
         self.assertEqual(self.request('PUT', '/api/slots/1', 'x' * 4097)[0], 413)
         for path, methods in (('/api/slots', ('PUT', 'DELETE', 'POST', 'PATCH')),
-                              ('/api/slots/1', ('POST', 'PATCH', 'BOGUS'))):
+                              ('/api/slots/1', ('POST', 'BOGUS'))):
             for method in methods:
                 self.assertEqual(self.request(method, path)[0], 405)
 
@@ -165,6 +166,52 @@ class APITest(unittest.TestCase):
             for method in ('GET', 'PUT', 'DELETE'):
                 for headers in ({}, {'X-Authentik-Uid': 'alice'}, {'X-Kotoka-Proxy-Secret': 'wrong', 'X-Authentik-Uid': 'alice'}):
                     self.assertEqual(self.request(method, path, headers=headers)[0], 403)
+
+    def test_names_and_rename(self):
+        for name in ('', '   ', 'x' * 41, 'a\x00b', 'a\nb', 'a\x7fb', 'a\x85b', None, 1, True, [], {}):
+            for method in ('PUT', 'PATCH'):
+                self.assertEqual(self.request(method, '/api/slots/1', json.dumps(dict(state='{}', summary={}, name=name)))[0], 400)
+        for method in ('PUT', 'PATCH'):
+            self.assertEqual(self.request(method, '/api/slots/1', '{"state":"{}","summary":{}}')[0], 400)
+        for name in ('木' * 40, '  valid name　', '😀' * 40):
+            result = self.put_slot(name=name)
+            self.assertEqual(result[0], 200)
+            self.assertEqual(result[1]['name'], name.strip())
+            self.assertEqual(self.request(path='/api/slots/1')[1]['name'], name.strip())
+            self.assertEqual(self.request(path='/api/slots')[1]['slots'][0]['name'], name.strip())
+        before = self.request(path='/api/slots/1')[1]
+        self.assertEqual(self.request('PATCH', '/api/slots/1', '{"name":" Renamed "}')[:2], (200, {'slot': 1, 'name': 'Renamed'}))
+        self.assertEqual(self.request(path='/api/slots/1')[1], dict(before, name='Renamed'))
+        self.assertEqual(self.request('PATCH', '/api/slots/2', '{"name":"New"}')[:2], (404, {'error': 'empty slot'}))
+        self.assertEqual(self.request('PATCH', '/api/slots/1', 'x' * 4097)[0], 413)
+
+    def test_create(self):
+        self.assertEqual(self.put_slot(create=True)[0], 200)
+        before = self.request(path='/api/slots/1')[1]
+        self.assertEqual(self.put_slot(state='{"new":1}', summary={'new': 1}, name='New', create=True)[:2], (409, {'error': 'slot in use'}))
+        self.assertEqual(self.request(path='/api/slots/1')[1], before)
+        for create in (None, 0, 1, 'true', [], {}):
+            self.assertEqual(self.put_slot(create=create)[0], 400)
+        self.assertEqual(self.put_slot(create=False)[0], 200)
+
+    def test_migration(self):
+        old_path = str(Path(self.temp_path) / 'old-db')
+        with sqlite3.connect(old_path) as db:
+            db.execute('CREATE TABLE slots (uid TEXT, slot INTEGER, '
+                       'updated_at TEXT, username TEXT, summary TEXT, state TEXT, PRIMARY KEY(uid, slot))')
+            db.execute('INSERT INTO slots VALUES (?, ?, ?, ?, ?, ?)', ('alice', 1, 'old-time', 'Alice', '{}', '{}'))
+        self.server.shutdown()
+        self.server.server_close()
+        self.thread.join()
+        with patch.dict(os.environ, ADR_DB_PATH=old_path):
+            self.server = create_server('127.0.0.1', 0)
+        self.thread = threading.Thread(target=self.server.serve_forever)
+        self.thread.start()
+        self.assertEqual(self.request(path='/api/slots')[1]['slots'], [dict(slot=1, updatedAt='old-time', summary={}, size=2, name='')])
+        self.assertEqual(self.request(path='/api/slots/1')[1]['name'], '')
+        self.assertEqual(self.put_slot(name='Migrated')[0], 200)
+        self.assertEqual(self.put_slot(2, create=True)[0], 200)
+        self.assertEqual(self.put(None)[0], 200)
 
     def test_secret_required(self):
         for value in ('', str(Path(self.temp_path) / 'missing')):

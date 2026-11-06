@@ -3,6 +3,7 @@ import hmac
 import json
 import os
 import sqlite3
+import unicodedata
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -22,7 +23,7 @@ def create_server(host='0.0.0.0', port=None):
         raise ValueError('Proxy secret must not be empty')
     db_path = os.environ.get('ADR_DB_PATH', '/data/saves.db')
     keep = int(os.environ.get('ADR_KEEP_REVISIONS', '1'))
-    max_slots = int(os.environ.get('ADR_MAX_SLOTS', '20'))
+    max_slots = int(os.environ.get('ADR_MAX_SLOTS', '19'))
     max_body = int(os.environ.get('ADR_MAX_BODY', str(2 * 1024 * 1024)))
     if keep < 1 or max_body < 1 or max_slots < 1:
         raise ValueError('Retention and body limit must be positive')
@@ -32,6 +33,8 @@ def create_server(host='0.0.0.0', port=None):
                    'updated_at TEXT, username TEXT, state TEXT, PRIMARY KEY(uid, revision))')
         db.execute('CREATE TABLE IF NOT EXISTS slots (uid TEXT, slot INTEGER, '
                    'updated_at TEXT, username TEXT, summary TEXT, state TEXT, PRIMARY KEY(uid, slot))')
+        if 'name' not in {row[1] for row in db.execute('PRAGMA table_info(slots)')}:
+            db.execute('ALTER TABLE slots ADD COLUMN name TEXT')
 
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *args):
@@ -71,7 +74,7 @@ def create_server(host='0.0.0.0', port=None):
                 slot = int(number)
                 if not 1 <= slot <= max_slots:
                     return self.reply(404, {'error': 'no such slot'})
-                methods[url.path] = ('GET', 'PUT', 'DELETE')
+                methods[url.path] = ('GET', 'PUT', 'DELETE', 'PATCH')
             if url.path not in methods:
                 return self.reply(404, {'error': 'not found'})
             if self.command not in methods[url.path]:
@@ -84,8 +87,8 @@ def create_server(host='0.0.0.0', port=None):
             db = sqlite3.connect(db_path, timeout=30)
             try:
                 if url.path == '/api/slots':
-                    rows = db.execute('SELECT slot, updated_at, summary, state FROM slots WHERE uid=? ORDER BY slot', (uid,))
-                    return self.reply(200, {'slots': [dict(slot=n, updatedAt=t, summary=json.loads(s), size=len(state.encode('utf-8'))) for n, t, s, state in rows]})
+                    rows = db.execute('SELECT slot, updated_at, summary, state, name FROM slots WHERE uid=? ORDER BY slot', (uid,))
+                    return self.reply(200, {'slots': [dict(slot=n, updatedAt=t, summary=json.loads(s), size=len(state.encode('utf-8')), name=name or '') for n, t, s, state, name in rows]})
                 if slot is not None:
                     return self.handle_slot(db, uid, username, slot)
                 if self.command == 'PUT':
@@ -109,7 +112,7 @@ def create_server(host='0.0.0.0', port=None):
             finally:
                 db.close()
 
-        def read_body(self):
+        def read_body(self, require_state=True):
             length = int(self.headers.get('Content-Length', '-1'))
             if length > max_body:
                 self.reply(413, {'error': 'body too large'})
@@ -119,18 +122,46 @@ def create_server(host='0.0.0.0', port=None):
             body = json.loads(self.rfile.read(length), parse_constant=reject_constant)
             if not isinstance(body, dict):
                 raise ValueError()
-            state = body.get('state')
-            if not isinstance(state, str) or not isinstance(json.loads(state, parse_constant=reject_constant), dict):
-                raise ValueError()
-            state.encode('utf-8')
+            if require_state:
+                state = body.get('state')
+                if not isinstance(state, str) or not isinstance(json.loads(state, parse_constant=reject_constant), dict):
+                    raise ValueError()
+                state.encode('utf-8')
             return body
 
+        def read_name(self, body):
+            name = body.get('name')
+            if not isinstance(name, str) or any(unicodedata.category(c) == 'Cc' for c in name):
+                raise ValueError()
+            name = name.strip()
+            if not 1 <= len(name) <= 40:
+                raise ValueError()
+            name.encode('utf-8')
+            return name
+
         def handle_slot(self, db, uid, username, slot):
+            if self.command == 'PATCH':
+                try:
+                    body = self.read_body(require_state=False)
+                    if body is None:
+                        return
+                    name = self.read_name(body)
+                except (ValueError, UnicodeError, RecursionError):
+                    return self.reply(400, {'error': 'invalid body'})
+                with db:
+                    db.execute('BEGIN IMMEDIATE')
+                    changed = db.execute('UPDATE slots SET name=? WHERE uid=? AND slot=?', (name, uid, slot)).rowcount
+                if not changed:
+                    return self.reply(404, {'error': 'empty slot'})
+                return self.reply(200, dict(slot=slot, name=name))
             if self.command == 'PUT':
                 try:
                     body = self.read_body()
                     if body is None:
                         return
+                    name = self.read_name(body)
+                    if not isinstance(body.get('create', False), bool):
+                        raise ValueError()
                     if not isinstance(body.get('summary'), dict):
                         raise ValueError()
                     summary = json.dumps(body['summary'], ensure_ascii=False, separators=(',', ':'))
@@ -140,10 +171,12 @@ def create_server(host='0.0.0.0', port=None):
                     return self.reply(400, {'error': 'invalid body'})
                 with db:
                     db.execute('BEGIN IMMEDIATE')
+                    if body.get('create', False) and db.execute('SELECT 1 FROM slots WHERE uid=? AND slot=?', (uid, slot)).fetchone():
+                        return self.reply(409, {'error': 'slot in use'})
                     updated = datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
-                    db.execute('INSERT OR REPLACE INTO slots VALUES (?, ?, ?, ?, ?, ?)',
-                               (uid, slot, updated, username, summary, body['state']))
-                return self.reply(200, dict(slot=slot, updatedAt=updated))
+                    db.execute('INSERT OR REPLACE INTO slots (uid, slot, updated_at, username, summary, state, name) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                               (uid, slot, updated, username, summary, body['state'], name))
+                return self.reply(200, dict(slot=slot, updatedAt=updated, name=name))
             if self.command == 'DELETE':
                 with db:
                     db.execute('BEGIN IMMEDIATE')
@@ -151,10 +184,10 @@ def create_server(host='0.0.0.0', port=None):
                 if not deleted:
                     return self.reply(404, {'error': 'empty slot'})
                 return self.reply(200, dict(slot=slot, deleted=True))
-            row = db.execute('SELECT updated_at, summary, state FROM slots WHERE uid=? AND slot=?', (uid, slot)).fetchone()
+            row = db.execute('SELECT updated_at, summary, state, name FROM slots WHERE uid=? AND slot=?', (uid, slot)).fetchone()
             if not row:
                 return self.reply(404, {'error': 'empty slot'})
-            return self.reply(200, dict(slot=slot, updatedAt=row[0], summary=json.loads(row[1]), state=row[2]))
+            return self.reply(200, dict(slot=slot, updatedAt=row[0], summary=json.loads(row[1]), state=row[2], name=row[3] or ''))
 
         def put_save(self, db, uid, username):
             try:
