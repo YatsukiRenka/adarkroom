@@ -47,6 +47,7 @@
 		placeLog(portrait);
 		stripDots();
 		layout();
+		placeEvents();
 	}
 
 	// Menu labels end with '.' ('save.', '保存.' ...), which looks off on dock buttons. The game
@@ -250,6 +251,73 @@
 			return result;
 		};
 	}
+	// Events (fights, stories, dialogs): in touch layouts the panel leaves the zoomed #wrapper, is
+	// centred between dock and log and scaled to fit the screen (buttons scale with it), above a
+	// backdrop that blocks taps on the game behind. Events keeps jQuery references to the panel,
+	// so moving the element keeps it working.
+	var backdrop = null, eventResize = window.ResizeObserver ? new ResizeObserver(function() { placeEvents(); }) : null;
+
+	function translucentBackground() {
+		var bg = themeBackground(), m = bg.match(/\d+(\.\d+)?/g);
+		return bg === '#fff' || !m ? 'rgba(255, 255, 255, 0.6)' : 'rgba(' + m[0] + ', ' + m[1] + ', ' + m[2] + ', 0.6)';
+	}
+
+	function placeEvents() {
+		var dock = isDock(), wrapper = document.getElementById('wrapper');
+		var panels = Array.prototype.slice.call(document.querySelectorAll('.eventPanel'));
+		panels.forEach(function(panel) {
+			var parent = dock ? document.body : wrapper;
+			if(panel.parentNode !== parent) parent.appendChild(panel);
+			if(eventResize && !panel.kotokaObserved) { eventResize.observe(panel); panel.kotokaObserved = true; }
+			// Upstream tints the white panel through its :before mask, which is hidden here.
+			if(dock) { panel.style.backgroundColor = themeBackground(); sizeEvent(panel); }
+			else panel.style.left = panel.style.top = panel.style.transform = panel.style.backgroundColor = '';
+		});
+		var show = dock && panels.length > 0;
+		if(show && !backdrop) backdrop = $('<div id="kotoka-event-backdrop">').appendTo('body');
+		if(backdrop) backdrop.css('background-color', translucentBackground());
+		if(!show && backdrop) { backdrop.remove(); backdrop = null; }
+	}
+
+	function sizeEvent(panel) {
+		var top = menuHeight(), bottom = logHeight(), margin = 12;
+		var availW = window.innerWidth - 2 * margin, availH = window.innerHeight - top - bottom - 2 * margin;
+		var w = panel.offsetWidth, h = panel.offsetHeight;
+		if(!w || !h) return;
+		var scale = Math.min(1.5, availW / w, availH / h);
+		panel.style.left = '50%';
+		panel.style.top = (top + (window.innerHeight - top - bottom) / 2) + 'px';
+		panel.style.transform = 'translate(-50%, -50%) scale(' + scale + ')';
+	}
+
+	// Touch layouts: the map's visible area is split by its two diagonals into up/down/left/right
+	// regions (instead of directions relative to the wanderer's cell, which is a tiny target).
+	// World.drawMap binds World.click when it creates #map at runtime, so replacing it here works.
+	function visibleMapBox() {
+		var box = document.getElementById('map').getBoundingClientRect();
+		var top = Math.max(box.top, menuHeight()), bottom = Math.min(box.bottom, window.innerHeight - logHeight());
+		var left = Math.max(box.left, 0), right = Math.min(box.right, window.innerWidth);
+		return { left: left, top: top, width: right - left, height: bottom - top };
+	}
+
+	function directionOf(x, y, box) {
+		var u = (x - (box.left + box.width / 2)) / (box.width / 2);
+		var v = (y - (box.top + box.height / 2)) / (box.height / 2);
+		if(Math.abs(u) > Math.abs(v)) return u > 0 ? 'east' : 'west';
+		return v > 0 ? 'south' : 'north';
+	}
+
+	if(typeof World !== 'undefined') {
+		var cellClick = World.click;
+		World.click = function(event) {
+			if(!isDock()) return cellClick.apply(this, arguments);
+			var box = visibleMapBox();
+			if(box.width <= 0 || box.height <= 0) return;
+			var moves = { north: World.moveNorth, south: World.moveSouth, west: World.moveWest, east: World.moveEast };
+			moves[directionOf(event.clientX, event.clientY, box)]();
+		};
+	}
+
 	if(typeof World !== 'undefined') {
 		after(World, 'drawMap', layout);
 		// goHome switches Engine.activeModule directly, without Engine.travelTo
@@ -274,6 +342,11 @@
 		$(document).on('click', '.workerRow, .outfitRow', function() {
 			if(isDock() && $(this).find('.upBtn').length) openStepper($(this));
 		});
+		var wrapperEl = document.getElementById('wrapper');
+		if(wrapperEl) new MutationObserver(placeEvents).observe(wrapperEl, { childList: true });
+		new MutationObserver(function(records) {
+			if(records.some(function(r) { return Array.prototype.some.call(r.removedNodes, function(n) { return n.classList && n.classList.contains('eventPanel'); }); })) placeEvents();
+		}).observe(document.body, { childList: true });
 		// Safety net for any other way out of the world (death, events): restore the layout.
 		setInterval(function() {
 			var exploring = typeof World !== 'undefined' && Engine.activeModule === World;

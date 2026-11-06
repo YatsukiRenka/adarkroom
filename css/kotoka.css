@@ -101,8 +101,6 @@ body.kotoka-narrow > div#notifications {
 }
 body.kotoka-narrow > div#notifications div.notification { margin-bottom: 4px; }
 body.kotoka-narrow div#content { flex: none; }
-body.kotoka-narrow .eventPanel { left: 162px; top: 170px; }
-body.kotoka-narrow .eventPanel:before { left: -164px; width: 700px; }
 body.kotoka-narrow > div#saveNotify { top: auto; bottom: calc(9em + 10px); right: 10px; z-index: 36; font-size: 14px; }
 
 /* Landscape: the desktop layout (log column on the left) scaled to the screen width. */
@@ -159,6 +157,11 @@ body.kotoka-dock .menu .kotoka-lang { display: inline-block; }
 }
 /* World.drawMap sets an inline width from the unscaled map; follow the screen instead */
 #worldOuter.kotoka-world-fill #bagspace-world { margin-top: 18px; height: auto; max-height: 4.2em; width: auto !important; }
+
+/* Touch layouts: event panels centred and scaled by mobile.js (placeEvents), over a backdrop. */
+body.kotoka-dock > .eventPanel { position: fixed; z-index: 20; transform-origin: center center; }
+body.kotoka-dock > .eventPanel:before { display: none; }
+#kotoka-event-backdrop { position: fixed; inset: 0; z-index: 19; }
 
 /* Stepper for rows with up/down arrows (script/kotoka/mobile.js). */
 #kotoka-stepper {
