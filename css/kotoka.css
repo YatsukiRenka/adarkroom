@@ -72,7 +72,8 @@ div.button[data-hotkey]:after {
 /* Touch: no double-tap zoom on game controls (double-tap toggles auto mode). */
 div.button, .menu span { touch-action: manipulation; }
 
-/* Narrow screens: body.kotoka-narrow and --kotoka-zoom are set by script/kotoka/mobile.js. */
+/* Compact screens: body classes kotoka-dock / kotoka-landscape / kotoka-narrow and --kotoka-zoom
+   are set by script/kotoka/mobile.js. kotoka-narrow = portrait. */
 body.kotoka-narrow { overflow-x: hidden; }
 body.kotoka-narrow div#wrapper {
 	zoom: var(--kotoka-zoom, 1);
@@ -100,7 +101,16 @@ body.kotoka-narrow > div#notifications div.notification { margin-bottom: 4px; }
 body.kotoka-narrow div#content { flex: none; }
 body.kotoka-narrow .eventPanel { left: 162px; top: 170px; }
 body.kotoka-narrow .eventPanel:before { left: -164px; width: 700px; }
-body.kotoka-narrow .menu {
+body.kotoka-narrow div#saveNotify { top: auto; bottom: calc(4.6em + 16px); right: 10px; z-index: 36; }
+
+/* Landscape: the desktop layout (log column on the left) scaled to the screen width. */
+body.kotoka-landscape { overflow-x: hidden; }
+body.kotoka-landscape div#wrapper { zoom: var(--kotoka-zoom, 1); }
+body.kotoka-landscape div#saveNotify { top: auto; bottom: 10px; }
+
+/* Dock: the menu as one row of small buttons fixed to the top; scrolls sideways if needed. */
+.menu .kotoka-lang { display: none; }
+body.kotoka-dock .menu {
 	position: fixed;
 	top: 0;
 	left: 0;
@@ -108,18 +118,32 @@ body.kotoka-narrow .menu {
 	bottom: auto;
 	z-index: 40;
 	display: flex;
-	flex-wrap: wrap;
-	justify-content: center;
+	flex-wrap: nowrap;
 	align-items: center;
-	gap: 2px 14px;
-	padding: 6px 8px;
-	font-size: 14px;
+	gap: 6px;
+	padding: 5px 8px;
+	overflow-x: auto;
+	scrollbar-width: none;
+	font-size: 12px;
 	border-bottom: 1px solid currentColor;
 }
-body.kotoka-narrow .menu span { float: none; margin: 0; line-height: 1.9; }
-body.kotoka-narrow .menu .customSelect { position: relative; display: inline-block; width: 90px; height: 1.9em; }
-body.kotoka-narrow .customSelectOptions > ul { top: 0; bottom: auto; width: 90px; background: inherit; }
-body.kotoka-narrow div#saveNotify { top: auto; bottom: calc(4.6em + 16px); right: 10px; z-index: 36; }
+body.kotoka-dock .menu::-webkit-scrollbar { display: none; }
+body.kotoka-dock .menu > span {
+	flex: none;
+	float: none;
+	margin: 0;
+	padding: 3px 8px;
+	line-height: 1.4;
+	white-space: nowrap;
+	border: 1px solid currentColor;
+	border-radius: 4px;
+}
+/* centre the row when it fits, scroll from the first button when it does not */
+body.kotoka-dock .menu > span:first-child { margin-left: auto; }
+body.kotoka-dock .menu > span:last-child { margin-right: auto; }
+body.kotoka-dock .menu > span:hover { text-decoration: none; }
+body.kotoka-dock .menu .customSelect { display: none; }
+body.kotoka-dock .menu .kotoka-lang { display: inline-block; }
 
 /* Stepper for rows with up/down arrows (script/kotoka/mobile.js). */
 #kotoka-stepper {

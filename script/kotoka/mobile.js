@@ -1,19 +1,25 @@
-// Phones and other narrow screens. The game layout is a fixed 700px design (plus a 220px
-// notification column), so on narrow screens body gets class `kotoka-narrow`: the notifications
-// move above the game and #wrapper is scaled with CSS zoom to the screen width (css/kotoka.css).
-// On narrow screens also:
-// - the footer menu is fixed to the top of the screen and the notification log to the bottom
-//   (moved out of the zoomed #wrapper so it keeps a readable size);
-// - while exploring, the map is centred in the screen (or, when it does not fit, the wanderer);
-// - tapping a row with tiny up/down arrows (workers, outfitting) opens a stepper with big buttons.
+// Phones and other narrow screens. The game layout is a fixed 700px design plus a 220px
+// notification column. Below DESKTOP_MIN width (css/kotoka.css does the styling):
+// - `kotoka-dock` (both orientations): the footer menu becomes a one-row dock of small buttons
+//   fixed to the top, with an English/中文 toggle instead of the hover language list; while
+//   exploring the map is centred (or, when it does not fit, the wanderer); tapping a row with tiny
+//   up/down arrows (workers, outfitting) opens a stepper with big buttons.
+// - `kotoka-landscape`: desktop layout (log column on the left) scaled to the screen width.
+// - `kotoka-narrow` (portrait): only the 700px game is scaled; the notification log is moved out of
+//   the zoomed #wrapper and fixed to the bottom of the screen at a readable size.
 // Space flight only had keyboard controls; on touch screens the ship follows the finger.
 (function() {
 	var DESKTOP_MIN = 940; // 220px notification column + 700px game + margins
-	var DESIGN_WIDTH = 716; // 700px game + 8px padding on each side
+	var DESIGN_WIDTH = 716; // portrait: 700px game + 8px padding on each side
+	var LANDSCAPE_WIDTH = 940; // landscape: the whole desktop layout
 	var STEPS = [['dnManyBtn', '−10'], ['dnBtn', '−1'], ['upBtn', '+1'], ['upManyBtn', '+10']];
 
 	function isNarrow() {
 		return document.body.classList.contains('kotoka-narrow');
+	}
+
+	function isDock() {
+		return document.body.classList.contains('kotoka-dock');
 	}
 
 	// Mobile browsers widen the layout viewport to fit wide content, so innerWidth alone can
@@ -29,12 +35,37 @@
 
 	function fit() {
 		var width = screenWidth();
-		var narrow = width < DESKTOP_MIN;
-		document.body.classList.toggle('kotoka-narrow', narrow);
-		var zoom = narrow ? Math.min(1, width / DESIGN_WIDTH) : 1;
+		var compact = width < DESKTOP_MIN;
+		var landscape = compact && window.matchMedia('(orientation: landscape)').matches;
+		var portrait = compact && !landscape;
+		var classes = document.body.classList;
+		classes.toggle('kotoka-dock', compact);
+		classes.toggle('kotoka-landscape', landscape);
+		classes.toggle('kotoka-narrow', portrait);
+		var zoom = portrait ? Math.min(1, width / DESIGN_WIDTH) : landscape ? Math.min(1, width / LANDSCAPE_WIDTH) : 1;
 		document.documentElement.style.setProperty('--kotoka-zoom', String(zoom));
-		placeLog(narrow);
+		placeLog(portrait);
+		stripDots();
 		layout();
+	}
+
+	// Menu labels end with '.' ('save.', '保存.' ...), which looks off on dock buttons. The game
+	// rewrites some labels (sound, speed, cloud), so this runs on every change of the menu.
+	function stripDots() {
+		if(!isDock()) return;
+		$('.menu > span').each(function() {
+			var text = this.textContent;
+			if(this.children.length === 0 && /[.。]$/.test(text)) this.textContent = text.replace(/[.。]+$/, '');
+		});
+	}
+
+	// Only English and 简体中文 remain, so the dock offers a one-tap switch to the other one.
+	function addLanguageToggle() {
+		var menu = $('.menu');
+		if(!menu.length || menu.find('.kotoka-lang').length) return;
+		var other = window.lang === 'zh_cn' ? 'en' : 'zh_cn';
+		$('<span class="menuBtn kotoka-lang">').text(other === 'en' ? 'English' : '中文').prependTo(menu)
+			.on('click', function() { Engine.switchLanguage($('<li>').attr('data-language', other)[0]); });
 	}
 
 	// Notifications.notify finds the log by id, so moving the element keeps it working.
@@ -53,17 +84,17 @@
 
 	function menuHeight() {
 		var menu = document.querySelector('.menu');
-		return isNarrow() && menu ? menu.offsetHeight : 0;
+		return isDock() && menu ? menu.offsetHeight : 0;
 	}
 
 	// Padding = fixed menu (top) and log (bottom); while exploring, extra space centres the map.
 	function layout() {
 		var body = document.body, menu = document.querySelector('.menu');
-		if(menu) menu.style.backgroundColor = isNarrow() ? themeBackground() : '';
+		if(menu) menu.style.backgroundColor = isDock() ? themeBackground() : '';
 		var log = document.getElementById('notifications');
 		if(log && isNarrow()) log.style.backgroundColor = themeBackground();
 		var top = menuHeight(), bottom = logHeight();
-		var exploring = isNarrow() && typeof World !== 'undefined' && Engine.activeModule === World;
+		var exploring = isDock() && typeof World !== 'undefined' && Engine.activeModule === World;
 		body.style.paddingTop = top ? top + 'px' : '';
 		body.style.paddingBottom = exploring ? 'calc(60vh + ' + bottom + 'px)' : bottom ? bottom + 'px' : '';
 		var map = document.getElementById('map');
@@ -150,12 +181,15 @@
 	after(Engine, 'turnLightsOff', layout);
 
 	$(function() {
+		addLanguageToggle();
 		fit();
 		$(window).on('resize orientationchange', fit);
 		var menu = document.querySelector('.menu');
 		if(menu && window.ResizeObserver) new ResizeObserver(layout).observe(menu);
+		if(menu) new MutationObserver(stripDots).observe(menu, { subtree: true, childList: true, characterData: true });
+		stripDots();
 		$(document).on('click', '.workerRow, .outfitRow', function() {
-			if(isNarrow() && $(this).find('.upBtn').length) openStepper($(this));
+			if(isDock() && $(this).find('.upBtn').length) openStepper($(this));
 		});
 		document.addEventListener('touchstart', steer, { passive: false });
 		document.addEventListener('touchmove', steer, { passive: false });
