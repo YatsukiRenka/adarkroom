@@ -37,13 +37,13 @@
 		'attack 4': '攻击 4', 'attack 5': '攻击 5', 'attack 6': '攻击 6',
 		'reset to defaults': '恢复默认', 'unbound': '未绑定',
 		'press a key (Escape cancels; Backspace or Delete unbinds)': '请按键（Esc 取消，退格或 Delete 解除绑定）',
-		'hold a button or its hotkey for half a second to toggle auto mode.': '长按按钮或其快捷键半秒即可切换自动模式.'
+		'double-click a button or double-press its hotkey to toggle auto mode.': '双击按钮或连按两下快捷键可切换自动模式.'
 	} });
 	$(function() {
 		var raw;
 		try { raw = localStorage.getItem('kotoka.hotkeys'); } catch(e) {}
 		var bindings = load(raw), panel, waiting, previousFocus;
-		var held = new Map();
+		var held = new Set(), tracking = null, trackedButton;
 		function target(a) {
 			return a.selector ? $('#event').find(a.selector).first() : $('#event #attackButtons .button').eq(a.index);
 		}
@@ -56,7 +56,7 @@
 			hints();
 			renderRows();
 		}
-		function cancelHolds() { held.forEach(clearTimeout); held.clear(); }
+		function resetTracking() { held.clear(); tracking = null; trackedButton = null; }
 		function close() { panel.remove(); panel = null; waiting = null; if(previousFocus) previousFocus.focus(); }
 		function renderRows() {
 			panel.find('[data-action]').each(function() {
@@ -66,13 +66,13 @@
 		}
 		function open() {
 			if(panel) return;
-			cancelHolds();
+			resetTracking();
 			previousFocus = document.activeElement;
 			panel = $('<div id="kotoka-hotkeys" role="dialog" aria-modal="true" tabindex="-1">').attr('aria-label', _('Hotkeys')).appendTo('body');
 			var bg = $('body').css('background-color');
 			panel.css('background-color', /^(transparent|rgba\(0, 0, 0, 0\))$/.test(bg) ? '#fff' : bg);
 			$('<h2>').text(_('Hotkeys')).appendTo(panel);
-			$('<p>').text(_('hold a button or its hotkey for half a second to toggle auto mode.')).appendTo(panel);
+			$('<p>').text(_('double-click a button or double-press its hotkey to toggle auto mode.')).appendTo(panel);
 			actions.forEach(function(a) {
 				var row = $('<button type="button" class="kotoka-key-row">').attr('data-action', a.id).appendTo(panel);
 				$('<span>').text(_(a.label)).appendTo(row);
@@ -90,7 +90,7 @@
 			if(panel) {
 				block(e);
 				if(e.repeat) return;
-				held.set(e.code, null);
+				held.add(e.code);
 				if(waiting) {
 					if(e.code !== 'Escape') bindings = rebind(bindings, waiting, /^(Backspace|Delete)$/.test(e.code) ? null : e.code);
 					waiting = null; save();
@@ -98,22 +98,25 @@
 				return;
 			}
 			if(held.has(e.code)) { block(e); return; }
-			if(e.repeat || e.ctrlKey || e.altKey || e.metaKey || $(e.target).closest('input, textarea, select').length || e.target.isContentEditable) return;
+			if(e.repeat || e.ctrlKey || e.altKey || e.metaKey || e.shiftKey || $(e.target).closest('input, textarea, select').length || e.target.isContentEditable) return;
 			var action = actions.find(function(a) { return bindings[a.id] === e.code; });
-			if(!action) return;
+			if(!action) { tracking = null; return; }
 			var btn = target(action);
-			if(!btn.length) return;
+			if(!btn.length) { tracking = null; return; }
 			block(e);
-			Kotoka.AutoRepeat.press(btn);
-			held.set(e.code, setTimeout(function() {
-				if(target(action)[0] === btn[0]) Kotoka.AutoRepeat.toggle(btn);
-			}, 500));
+			if(trackedButton !== btn[0]) tracking = null;
+			var result = Kotoka.autoRepeatDecision(tracking, btn.data('cooldown') > 0 ? e.code : null, Date.now(), Kotoka.AutoRepeat.isAuto(btn));
+			tracking = result.state;
+			trackedButton = btn[0];
+			if(result.action === 'pass') Kotoka.AutoRepeat.press(btn);
+			else Kotoka.AutoRepeat.toggle(btn);
+			held.add(e.code);
 		}, true);
 		document.addEventListener('keyup', function(e) {
 			if(panel || held.has(e.code)) block(e);
-			clearTimeout(held.get(e.code)); held.delete(e.code);
+			held.delete(e.code);
 		}, true);
-		window.addEventListener('blur', cancelHolds);
+		window.addEventListener('blur', resetTracking);
 		new MutationObserver(hints).observe(document.getElementById('wrapper') || document.body, { childList: true, subtree: true });
 		hints();
 		Kotoka.Hotkeys = { _logic: logic };

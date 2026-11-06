@@ -1,8 +1,19 @@
+(function(root) {
+	function decide(previous, id, timestamp, isAuto) {
+		if(isAuto) return { action: 'auto-off', state: null };
+		if(id == null) return { action: 'pass', state: null };
+		if(previous && previous.id === id && timestamp - previous.timestamp <= 350) {
+			return { action: 'auto-on', state: null };
+		}
+		return { action: 'pass', state: { id: id, timestamp: timestamp } };
+	}
+	if(typeof module !== 'undefined' && module.exports) { module.exports = { decide: decide }; return; }
+	root.Kotoka.autoRepeatDecision = decide;
 Kotoka.addStrings({ zh_cn: { 'auto': '自动' } });
 
 $(function() {
 	var active = new Set();
-	var hold, swallowed;
+	var tracking = null;
 	var guards = {
 		stokeButton: function() { return $SM.get('game.fire.value') < Room.FireEnum.Roaring.value; }
 	};
@@ -26,34 +37,17 @@ $(function() {
 			btn.addClass('auto').attr('data-auto', _('auto'));
 		}
 	}
-	function cancel() {
-		if(hold) clearTimeout(hold.timer);
-		hold = null;
-	}
-	document.addEventListener('mousedown', function(e) {
-		if(e.button !== 0) return;
-		cancel();
-		swallowed = null;
-		var btn = $(e.target).closest('div.button');
-		if(!(btn.data('cooldown') > 0)) return;
-		hold = { el: btn[0], timer: setTimeout(function() {
-			swallowed = btn[0];
-			toggle(btn);
-		}, 500) };
-	}, true);
-	document.addEventListener('mouseout', function(e) {
-		if(hold && hold.el.contains(e.target) && (!e.relatedTarget || !hold.el.contains(e.relatedTarget))) cancel();
-	}, true);
-	document.addEventListener('mouseup', cancel, true);
-	window.addEventListener('blur', cancel);
+	window.addEventListener('blur', function() { tracking = null; });
 	document.addEventListener('click', function(e) {
-		var el = $(e.target).closest('div.button')[0];
-		if(el && (el === swallowed || active.has(el))) {
-			if(el !== swallowed) stop(el);
+		var btn = $(e.target).closest('div.button');
+		var el = btn.data('cooldown') > 0 ? btn[0] : null;
+		var result = decide(tracking, el, Date.now(), active.has(el));
+		tracking = result.state;
+		if(result.action !== 'pass') {
+			toggle(el);
 			e.preventDefault();
 			e.stopImmediatePropagation();
 		}
-		swallowed = null;
 	}, true);
 	new MutationObserver(function(records) {
 		records.forEach(function(record) {
@@ -70,3 +64,4 @@ $(function() {
 	}, 200);
 	Kotoka.AutoRepeat = { press: press, toggle: toggle, isAuto: function(btn) { return active.has($(btn)[0]); } };
 });
+})(typeof window !== 'undefined' ? window : globalThis);
