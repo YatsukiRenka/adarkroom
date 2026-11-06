@@ -2,6 +2,7 @@
 // footer labels upstream left untranslated). Module-specific strings live in their modules.
 Kotoka.addStrings({
   zh_cn: {
+    'cloud slots': '云存档位',
     'speed x{0}.': '速度 x{0}.',
     'Game Speed': '游戏速度',
     'choose how fast the game runs.': '选择游戏运行的速度.',

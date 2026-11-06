@@ -18,7 +18,7 @@ div.button[data-hotkey]:after {
 	line-height: 10px;
 	pointer-events: none;
 }
-#kotoka-hotkeys {
+#kotoka-hotkeys, #kotoka-cloud-slots {
 	position: fixed;
 	z-index: 100;
 	inset: 0;
@@ -26,8 +26,8 @@ div.button[data-hotkey]:after {
 	overflow: auto;
 	padding: 25px max(20px, calc((100vw - 500px) / 2));
 }
-#kotoka-hotkeys h2 { font-size: 18px; font-weight: normal; }
-#kotoka-hotkeys button {
+#kotoka-hotkeys h2, #kotoka-cloud-slots h2 { font-size: 18px; font-weight: normal; }
+#kotoka-hotkeys button, #kotoka-cloud-slots button {
 	font: inherit;
 	color: inherit;
 	background: transparent;
@@ -36,7 +36,7 @@ div.button[data-hotkey]:after {
 	margin: 0 5px 5px 0;
 	cursor: pointer;
 }
-#kotoka-hotkeys button:hover { text-decoration: underline; }
+#kotoka-hotkeys button:hover, #kotoka-cloud-slots button:hover { text-decoration: underline; }
 #kotoka-hotkeys .kotoka-key-row {
 	display: flex;
 	justify-content: space-between;
@@ -44,3 +44,6 @@ div.button[data-hotkey]:after {
 	width: 100%;
 	text-align: left;
 }
+
+#kotoka-cloud-slots .kotoka-slot-row { margin-bottom: 16px; }
+#kotoka-cloud-slots button:disabled { opacity: 0.5; cursor: default; }

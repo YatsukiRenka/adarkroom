@@ -288,6 +288,12 @@
               _('or migrating computers')
             ],
             buttons: {
+              ...(window.Kotoka && Kotoka.CloudSave && Kotoka.CloudSave.isLoggedIn() ? {
+                cloudSlots: {
+                  text: _('cloud slots'), nextScene: 'end',
+                  onChoose: function() { setTimeout(function() { Kotoka.CloudSlots.open(); }, 0); }
+                }
+              } : {}),
               'export': {
                 text: _('export'),
                 nextScene: {1: 'inputExport'}
