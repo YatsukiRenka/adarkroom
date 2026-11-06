@@ -86,6 +86,7 @@
 			if(e.key === 'Escape') { e.preventDefault(); if(e.type === 'keyup' && !busy) cancel(); }
 		});
 		input.focus();
+		if(initial) input[0].select();
 	}
 	function render() {
 		list.empty(); nav.empty();

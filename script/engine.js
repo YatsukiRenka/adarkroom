@@ -891,7 +891,8 @@
   };
 
   function eventNullifier(e) {
-    return $(e.target).hasClass('menuBtn');
+    // Text inputs must stay selectable/editable (kotoka.club cloud window).
+    return $(e.target).hasClass('menuBtn') || $(e.target).is('input, textarea');
   }
 
   function eventPassthrough(e) {
