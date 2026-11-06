@@ -75,6 +75,8 @@ div.button, .menu span { touch-action: manipulation; }
 /* Compact screens: body classes kotoka-dock / kotoka-landscape / kotoka-narrow and --kotoka-zoom
    are set by script/kotoka/mobile.js. kotoka-narrow = portrait. */
 body.kotoka-narrow { overflow-x: hidden; }
+/* main.css sets body height 100%; with the dock/log padding that overflowed the screen */
+body.kotoka-dock { height: auto; min-height: 100vh; box-sizing: border-box; }
 body.kotoka-narrow div#wrapper {
 	zoom: var(--kotoka-zoom, 1);
 	width: 700px;
@@ -90,7 +92,7 @@ body.kotoka-narrow > div#notifications {
 	left: 0;
 	right: 0;
 	width: auto;
-	height: 4.6em;
+	height: 9em;
 	z-index: 35;
 	overflow: hidden;
 	padding: 6px 10px 0;
@@ -101,7 +103,7 @@ body.kotoka-narrow > div#notifications div.notification { margin-bottom: 4px; }
 body.kotoka-narrow div#content { flex: none; }
 body.kotoka-narrow .eventPanel { left: 162px; top: 170px; }
 body.kotoka-narrow .eventPanel:before { left: -164px; width: 700px; }
-body.kotoka-narrow div#saveNotify { top: auto; bottom: calc(4.6em + 16px); right: 10px; z-index: 36; }
+body.kotoka-narrow > div#saveNotify { top: auto; bottom: calc(9em + 10px); right: 10px; z-index: 36; font-size: 14px; }
 
 /* Landscape: the desktop layout (log column on the left) scaled to the screen width. */
 body.kotoka-landscape { overflow-x: hidden; }

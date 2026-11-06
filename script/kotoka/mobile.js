@@ -68,13 +68,39 @@
 			.on('click', function() { Engine.switchLanguage($('<li>').attr('data-language', other)[0]); });
 	}
 
-	// Notifications.notify finds the log by id, so moving the element keeps it working.
+	// Notifications.notify and Engine.saveGame find these by id, so moving them keeps them working.
 	function placeLog(narrow) {
-		var log = document.getElementById('notifications'), wrapper = document.getElementById('wrapper');
-		if(!log || !wrapper) return;
-		var parent = narrow ? document.body : wrapper;
-		if(log.parentNode !== parent) parent.appendChild(log);
-		log.style.backgroundColor = narrow ? themeBackground() : '';
+		var wrapper = document.getElementById('wrapper');
+		['notifications', 'saveNotify'].forEach(function(id) {
+			var el = document.getElementById(id);
+			if(!el || !wrapper) return;
+			var parent = narrow ? document.body : wrapper;
+			if(el.parentNode !== parent) parent.appendChild(el);
+		});
+		var log = document.getElementById('notifications');
+		if(log) log.style.backgroundColor = narrow ? themeBackground() : '';
+	}
+
+	// The game clips #content and #main at 700px; a big village pushes the stores below that.
+	// Grow both to fit the current location (all modes, only when needed).
+	function fitContent() {
+		var content = document.getElementById('content'), main = document.getElementById('main');
+		if(!content || !main) return;
+		var zoom = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--kotoka-zoom')) || 1;
+		var top = content.getBoundingClientRect().top, bottom = 0;
+		var panel = Engine.activeModule && Engine.activeModule.panel && Engine.activeModule.panel[0];
+		// Panel contents are mostly absolutely positioned, so measure every visible descendant.
+		var els = [document.getElementById('storesContainer')];
+		if(panel) els = els.concat(panel, Array.prototype.slice.call(panel.querySelectorAll('*')));
+		els.forEach(function(el) {
+			if(el && el.offsetParent !== null) bottom = Math.max(bottom, el.getBoundingClientRect().bottom - top);
+		});
+		var need = Math.max(700, Math.ceil(bottom / zoom) + 20);
+		var height = need > 700 ? need + 'px' : '';
+		if(content.style.height !== height) {
+			content.style.height = height;
+			main.style.height = height;
+		}
 	}
 
 	function logHeight() {
@@ -89,6 +115,7 @@
 
 	// Padding = fixed menu (top) and log (bottom); while exploring, extra space centres the map.
 	function layout() {
+		fitContent();
 		var body = document.body, menu = document.querySelector('.menu');
 		if(menu) menu.style.backgroundColor = isDock() ? themeBackground() : '';
 		var log = document.getElementById('notifications');
@@ -186,6 +213,9 @@
 		$(window).on('resize orientationchange', fit);
 		var menu = document.querySelector('.menu');
 		if(menu && window.ResizeObserver) new ResizeObserver(layout).observe(menu);
+		var stores = document.getElementById('storesContainer');
+		if(stores && window.ResizeObserver) new ResizeObserver(fitContent).observe(stores);
+		$('div.location').each(function() { if(window.ResizeObserver) new ResizeObserver(fitContent).observe(this); });
 		if(menu) new MutationObserver(stripDots).observe(menu, { subtree: true, childList: true, characterData: true });
 		stripDots();
 		$(document).on('click', '.workerRow, .outfitRow', function() {
