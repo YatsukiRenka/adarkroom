@@ -264,7 +264,7 @@ Events.Room = [
 	{/* The Shady Builder */
 		title: _('The Shady Builder'),
 		isAvailable: function() {
-			return Engine.activeModule == Room && $SM.get('game.buildings["hut"]', true) >= 5 && $SM.get('game.buildings["hut"]', true) < 20;
+			return Engine.activeModule == Room && $SM.get('game.buildings["hut"]', true) >= 5 && $SM.get('game.buildings["hut"]', true) < Room.Craftables.hut.maximum;
 		},
 		scenes: {
 			'start':{
@@ -304,7 +304,7 @@ Events.Room = [
 				notification: _('the shady builder builds a hut'),
 				onLoad: function() {
 					var n = $SM.get('game.buildings["hut"]', true);
-					if(n < 20){
+					if(n < Room.Craftables.hut.maximum){
 						$SM.set('game.buildings["hut"]',n+1);
 					}
 				},

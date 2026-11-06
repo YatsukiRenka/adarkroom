@@ -6,6 +6,7 @@ div.button.auto:before {
 	top: -9px;
 	font-size: 9px;
 	line-height: 10px;
+	color: #888;
 	pointer-events: none;
 }
 div.button[data-hotkey]:after {
@@ -21,7 +22,6 @@ div.button[data-hotkey]:after {
 	position: fixed;
 	z-index: 100;
 	inset: 0;
-	background: inherit;
 	color: inherit;
 	overflow: auto;
 	padding: 25px max(20px, calc((100vw - 500px) / 2));

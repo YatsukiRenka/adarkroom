@@ -69,6 +69,8 @@
 			cancelHolds();
 			previousFocus = document.activeElement;
 			panel = $('<div id="kotoka-hotkeys" role="dialog" aria-modal="true" tabindex="-1">').attr('aria-label', _('hotkeys.')).appendTo('body');
+			var bg = $('body').css('background-color');
+			panel.css('background-color', /^(transparent|rgba\(0, 0, 0, 0\))$/.test(bg) ? '#fff' : bg);
 			$('<h2>').text(_('hotkeys.')).appendTo(panel);
 			$('<p>').text(_('hold a mouse button or key for 500 ms to toggle auto mode.')).appendTo(panel);
 			actions.forEach(function(a) {
