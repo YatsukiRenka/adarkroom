@@ -75,7 +75,7 @@
       debug: false,
       log: false,
       dropbox: false,
-      doubleTime: false
+      speed: 1
     },
 
     init: function(options) {
@@ -162,8 +162,8 @@
 
       $('<span>')
         .addClass('hyper menuBtn')
-        .text(_('hyper.'))
-        .click(Engine.confirmHyperMode)
+        .text(_('speed x{0}.', Engine.getSpeed()))
+        .click(Engine.confirmSpeed)
         .appendTo(menu);
 
       $('<span>')
@@ -238,9 +238,8 @@
         Engine.turnLightsOff();
       }
 
-      if($SM.get('config.hyperMode', true)){
-        Engine.triggerHyperMode();
-      }
+      var speed = $SM.get('config.speed', true);
+      Engine.setSpeed([1, 2, 3].includes(speed) ? speed : ($SM.get('config.hyperMode', true) === true ? 2 : 1));
 
       Engine.toggleVolume(Boolean($SM.get('config.soundOn')));
       if(!AudioEngine.isAudioContextRunning()){
@@ -591,40 +590,36 @@
       }
     },
 
-    confirmHyperMode: function(){
-      if (!Engine.options.doubleTime) {
-        Events.startEvent({
-          title: _('Go Hyper?'),
-          scenes: {
-            start: {
-              text: [_('turning hyper mode speeds up the game to x2 speed. do you want to do that?')],
-              buttons: {
-                'yes': {
-                  text: _('yes'),
-                  nextScene: 'end',
-                  onChoose: Engine.triggerHyperMode
-                },
-                'no': {
-                  text: _('no'),
-                  nextScene: 'end'
-                }
-              }
-            }
-          }
-        });
-      } else {
-        Engine.triggerHyperMode();
-      }
+    getSpeed: function() {
+      return [1, 2, 3].includes(Engine.options.speed) ? Engine.options.speed : 1;
     },
 
-    triggerHyperMode: function() {
-      Engine.options.doubleTime = !Engine.options.doubleTime;
-      if(Engine.options.doubleTime)
-        $('.hyper').text(_('classic.'));
-      else
-        $('.hyper').text(_('hyper.'));
+    setSpeed: function(n) {
+      Engine.options.speed = [1, 2, 3].includes(n) ? n : 1;
+      $SM.set('config.speed', Engine.getSpeed());
+      $SM.set('config.hyperMode', Engine.getSpeed() > 1);
+      $('.hyper').text(_('speed x{0}.', Engine.getSpeed()));
+    },
 
-      $SM.set('config.hyperMode', Engine.options.doubleTime, false);
+    confirmSpeed: function() {
+      var buttons = {};
+      [1, 2, 3].forEach(function(n) {
+        buttons['speed' + n] = {
+          text: _('x{0}', n),
+          nextScene: 'end',
+          onChoose: function() { Engine.setSpeed(n); }
+        };
+      });
+      buttons.cancel = { text: _('cancel'), nextScene: 'end' };
+      Events.startEvent({
+        title: _('Game Speed'),
+        scenes: {
+          start: {
+            text: [_('choose how fast the game runs.')],
+            buttons: buttons
+          }
+        }
+      });
     },
 
     // Gets a guid
@@ -727,33 +722,51 @@
     tabNavigation: true,
     restoreNavigation: false,
 
+    ignoreKey: function(e) {
+      var original = e.originalEvent || e;
+      var target = e.target || original.target;
+      return original.ctrlKey || original.altKey || original.metaKey ||
+        e.ctrlKey || e.altKey || e.metaKey ||
+        (target && (target.isContentEditable || $(target).closest('input, textarea, select, [contenteditable]:not([contenteditable="false"])').length > 0));
+    },
+
+    keyDirection: function(e) {
+      var code = (e.originalEvent || e).code;
+      if(code) {
+        return {KeyW: 'up', ArrowUp: 'up', KeyS: 'down', ArrowDown: 'down',
+          KeyA: 'left', ArrowLeft: 'left', KeyD: 'right', ArrowRight: 'right'}[code] || null;
+      }
+      return {38: 'up', 87: 'up', 40: 'down', 83: 'down',
+        37: 'left', 65: 'left', 39: 'right', 68: 'right'}[e.which] || null;
+    },
+
     keyDown: function(e) {
       e = e || window.event;
+      if(Engine.ignoreKey(e)) return;
       if(!Engine.keyPressed && !Engine.keyLock) {
         Engine.pressed = true;
         if(Engine.activeModule.keyDown) {
           Engine.activeModule.keyDown(e);
         }
       }
-      return jQuery.inArray(e.keycode, [37,38,39,40]) < 0;
+      var code = (e.originalEvent || e).code;
+      return !(code ? /^Arrow(Up|Down|Left|Right)$/.test(code) : [37, 38, 39, 40].includes(e.which));
     },
 
     keyUp: function(e) {
+      if(Engine.ignoreKey(e)) return;
       Engine.pressed = false;
       if(Engine.activeModule.keyUp) {
         Engine.activeModule.keyUp(e);
       } else {
-        switch(e.which) {
-          case 38: // Up
-          case 87:
+        switch(Engine.keyDirection(e)) {
+          case 'up':
             Engine.log('up');
             break;
-          case 40: // Down
-          case 83:
+          case 'down':
             Engine.log('down');
             break;
-          case 37: // Left
-          case 65:
+          case 'left':
             if (Engine.tabNavigation) {
               if (Engine.activeModule == Ship && Fabricator.tab) {
                 Engine.travelTo(Fabricator);
@@ -770,8 +783,7 @@
             }
             Engine.log('left');
             break;
-          case 39: // Right
-          case 68:
+          case 'right':
             if (Engine.tabNavigation){
               if (Engine.activeModule == Room && Outside.tab) {
                 Engine.travelTo(Outside);
@@ -871,9 +883,8 @@
     },
 
     setInterval: function(callback, interval, skipDouble){
-      if( Engine.options.doubleTime && !skipDouble ){
-        Engine.log('Double time, cutting interval in half');
-        interval /= 2;
+      if(!skipDouble){
+        interval /= Engine.getSpeed();
       }
 
       return setInterval(callback, interval);
@@ -882,9 +893,8 @@
 
     setTimeout: function(callback, timeout, skipDouble){
 
-      if( Engine.options.doubleTime && !skipDouble ){
-        Engine.log('Double time, cutting timeout in half');
-        timeout /= 2;
+      if(!skipDouble){
+        timeout /= Engine.getSpeed();
       }
 
       return setTimeout(callback, timeout);

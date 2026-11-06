@@ -567,24 +567,21 @@ var Space = {
 	},
 	
 	keyDown: function(event) {
-		switch(event.which) {
-			case 38: // Up
-			case 87:
+		if(Engine.ignoreKey(event)) return;
+		switch(Engine.keyDirection(event)) {
+			case 'up':
 				Space.up = true;
 				Engine.log('up on');
 				break;
-			case 40: // Down
-			case 83:
+			case 'down':
 				Space.down = true;
 				Engine.log('down on');
 				break;
-			case 37: // Left
-			case 65:
+			case 'left':
 				Space.left = true;
 				Engine.log('left on');
 				break;
-			case 39: // Right
-			case 68:
+			case 'right':
 				Space.right = true;
 				Engine.log('right on');
 				break;
@@ -592,24 +589,21 @@ var Space = {
 	},
 	
 	keyUp: function(event) {
-		switch(event.which) {
-			case 38: // Up
-			case 87:
+		if(Engine.ignoreKey(event)) return;
+		switch(Engine.keyDirection(event)) {
+			case 'up':
 				Space.up = false;
 				Engine.log('up off');
 				break;
-			case 40: // Down
-			case 83:
+			case 'down':
 				Space.down = false;
 				Engine.log('down off');
 				break;
-			case 37: // Left
-			case 65:
+			case 'left':
 				Space.left = false;
 				Engine.log('left off');
 				break;
-			case 39: // Right
-			case 68:
+			case 'right':
 				Space.right = false;
 				Engine.log('right off');
 				break;

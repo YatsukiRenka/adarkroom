@@ -101,10 +101,7 @@ var Button = {
 					$SM.set(id, $SM.get(id, true) - 0.5, true);
 				},500));
 			}
-			var time = start;
-			if (Engine.options.doubleTime){
-				time /= 2;
-			}
+			var time = start / Engine.getSpeed();
 			$('div.cooldown', btn).width(left * 100 +"%").animate({width: '0%'}, time * 1000, 'linear', function() {
 				Button.clearCooldown(btn, true);
 			});
