@@ -6,8 +6,8 @@
 		'offline': '离线', 'conflict': '存档冲突', 'save too large': '存档过大',
 		'not synced yet': '尚未同步', 'last synced: {0}': '上次同步：{0}',
 		'unknown': '未知', 'cloud updated: {0}': '云存档更新时间：{0}',
-		'cloud — wood: {0}, huts: {1}, population: {2}': '云存档——木材：{0}，小屋：{1}，人口：{2}',
-		'this browser — wood: {0}, huts: {1}, population: {2}': '此浏览器——木材：{0}，小屋：{1}，人口：{2}',
+		'cloud — wood: {0}, huts: {1}, population: {2}': '云存档——木头：{0}，小屋：{1}，人口：{2}',
+		'this browser — wood: {0}, huts: {1}, population: {2}': '此浏览器——木头：{0}，小屋：{1}，人口：{2}',
 		'choose which save to keep.': '请选择要保留的存档.'
 	} });
 	function parse(value) {
@@ -42,11 +42,19 @@
 		function count(v) { return typeof v === 'number' && Number.isFinite(v) ? v : null; }
 		return { wood: count(stores.wood), huts: count(buildings.hut), population: count(game.population) };
 	}
-	var api = { hash: hash, decide: decide, summary: summary, metadata: metadata };
+	function replaceLocalSave(state) {
+		localStorage.setItem('gameState', state);
+		Engine.saveGame = function() {};
+		location.reload();
+	}
+	var api = { replaceLocalSave: replaceLocalSave, hash: hash, decide: decide, summary: summary, metadata: metadata };
 	if(typeof module !== 'undefined' && module.exports) { module.exports = api; return; }
 	root.Kotoka.CloudSave = api;
 	$(function() {
 		var user, meta, ready = false, busy = false, loggedOut = false, error = '', lastSync, pending;
+		api.isLoggedIn = function() { return !!user; };
+		api.user = function() { return user; };
+		api.request = request;
 		var menu = $('<span class="menuBtn">').appendTo('.menu');
 		function render() { menu.text((user ? _('cloud: {0}.', user.username) : _('log in.')) + (busy ? ' …' : '')); }
 		function local() { return localStorage.getItem('gameState'); }
