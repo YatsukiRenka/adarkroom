@@ -1,5 +1,6 @@
 (function(root) {
-	function decide(previous, id, timestamp, isAuto) {
+	function decide(previous, id, timestamp, isAuto, modded) {
+		if(modded === false) return { action: 'pass', state: null };
 		if(isAuto) return { action: 'auto-off', state: null };
 		if(id == null) return { action: 'pass', state: null };
 		if(previous && previous.id === id && timestamp - previous.timestamp <= 350) {
@@ -29,6 +30,7 @@ $(function() {
 		$(el).removeClass('auto').removeAttr('data-auto');
 	}
 	function toggle(btn) {
+			if(!Kotoka.Mode.isModded()) return;
 		btn = $(btn);
 		if(!btn.length || !(btn.data('cooldown') > 0) || !document.documentElement.contains(btn[0])) return;
 		if(active.has(btn[0])) stop(btn[0]);
@@ -39,6 +41,7 @@ $(function() {
 	}
 	window.addEventListener('blur', function() { tracking = null; });
 	document.addEventListener('click', function(e) {
+			if(!Kotoka.Mode.isModded()) return;
 		var btn = $(e.target).closest('div.button');
 		var el = btn.data('cooldown') > 0 ? btn[0] : null;
 		var result = decide(tracking, el, Date.now(), active.has(el));
@@ -57,6 +60,7 @@ $(function() {
 		});
 	}).observe(document.body, { childList: true, subtree: true });
 	setInterval(function() {
+			if(!Kotoka.Mode.isModded()) return;
 		active.forEach(function(el) {
 			if(!document.documentElement.contains(el)) return stop(el);
 			if($(el).is(':visible') && (!guards[el.id] || guards[el.id]())) press(el);

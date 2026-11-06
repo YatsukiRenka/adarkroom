@@ -1,6 +1,6 @@
 (function(root) {
 	if(root.Kotoka) root.Kotoka.addStrings({ zh_cn: {
-		'Cloud Saves': '云存档', 'auto-save': '自动存档', 'auto-save every': '自动存档间隔',
+		'Cloud Saves ({0})': '云存档（{0}）', 'auto-save': '自动存档', 'auto-save every': '自动存档间隔',
 		'{0} min': '{0} 分钟', 'new save': '新建存档', 'rename': '重命名', 'untitled': '未命名',
 		'previous': '上一页', 'next': '下一页', 'page {0} / {1}': '第 {0}/{1} 页',
 		'all 19 save slots are in use.': '19 个存档位已用完.', 'save': '保存', 'ok': '确定', 'cancel': '取消',
@@ -154,10 +154,10 @@
 	api.open = function() {
 		if(panel || !Kotoka.CloudSave.isLoggedIn()) return;
 		previousFocus = document.activeElement; page = 1;
-		panel = $('<div id="kotoka-cloud-slots" role="dialog" aria-modal="true" tabindex="-1">').attr('aria-label', _('Cloud Saves')).appendTo('body');
+		panel = $('<div id="kotoka-cloud-slots" role="dialog" aria-modal="true" tabindex="-1">').attr('aria-label', _('Cloud Saves ({0})', _(Kotoka.Mode.current()))).appendTo('body');
 		var bg = $('body').css('background-color');
 		panel.css('background-color', /^(transparent|rgba\(0, 0, 0, 0\))$/.test(bg) ? '#fff' : bg);
-		$('<h2>').text(_('Cloud Saves')).appendTo(panel);
+		$('<h2>').text(_('Cloud Saves ({0})', _(Kotoka.Mode.current()))).appendTo(panel);
 		syncStatus = $('<p>').appendTo(panel); renderStatus();
 		var interval = $('<div>').text(_('auto-save every') + ' ').appendTo(panel);
 		[1, 5, 10].forEach(function(n) {

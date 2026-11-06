@@ -51,6 +51,7 @@
 	var api = { parseInterval: parseInterval, replaceLocalSave: replaceLocalSave, hash: hash, decide: decide, summary: summary, metadata: metadata };
 	if(typeof module !== 'undefined' && module.exports) { module.exports = api; return; }
 	root.Kotoka.CloudSave = api;
+		var profile = Kotoka.Mode.profile(Kotoka.Mode.current()), metaKey = Kotoka.Mode.metadataKey(profile), suspended = false;
 	$(function() {
 		var user, meta, ready = false, busy = false, loggedOut = false, error = '', lastSync, pending;
 		api.isLoggedIn = function() { return !!user; };
@@ -60,12 +61,17 @@
 		function render() { menu.text((user ? _('cloud: {0}.', user.username) : _('log in.')) + (busy ? ' …' : '')); }
 		function local() { return localStorage.getItem('gameState'); }
 		function adopt(state, revision) {
+			if(suspended) return;
 			meta = { uid: user.uid, revision: revision, hash: hash(state) };
-			localStorage.setItem('kotoka.cloud', JSON.stringify(meta));
+			localStorage.setItem(metaKey, JSON.stringify(meta));
 			lastSync = new Date(); error = ''; ready = true;
 		}
 		async function request(path, options) {
-			var response = await fetch(path, Object.assign({ credentials: 'same-origin', cache: 'no-store' }, options));
+			if(suspended) throw new Error('not synced yet');
+			var headers = new Headers(options && options.headers);
+			headers.set('X-Kotoka-Profile', profile);
+			var response = await fetch(path, Object.assign({ credentials: 'same-origin', cache: 'no-store' }, options, { headers: headers }));
+			if(suspended) throw new Error('not synced yet');
 			if(response.status === 401) {
 				user = null; meta = null; ready = false; pending = null; loggedOut = true;
 				throw new Error('not synced yet');
@@ -74,6 +80,7 @@
 		}
 		function fail(e) { error = e.message === 'save too large' ? e.message : (loggedOut ? 'not synced yet' : 'offline'); }
 		function download(cloud) {
+			if(suspended) return;
 			try {
 				localStorage.setItem('gameState', cloud.state);
 				adopt(cloud.state, cloud.revision);
@@ -93,7 +100,7 @@
 		}
 		function showConflict() {
 			// Wait while the cloud window covers the screen; the dialog would be hidden under it.
-			if(!pending || Engine.keyLock || busy || document.getElementById('kotoka-cloud-slots')) return;
+			if(suspended || !pending || Engine.keyLock || busy || document.getElementById('kotoka-cloud-slots')) return;
 			var cloud = pending; pending = null;
 			var date = new Date(cloud.updatedAt);
 			dialog([_('choose which save to keep.'), _('cloud updated: {0}', isNaN(date.getTime()) ? _('unknown') : date.toLocaleString()),
@@ -117,6 +124,7 @@
 			var response = await request('/api/save');
 			if(!response.ok && response.status !== 404) throw new Error('offline');
 			var cloud = response.status === 404 ? null : await response.json(), state = local();
+			if(suspended) return;
 			var action = decide({ local: state, meta: meta, cloud: cloud, uid: user.uid });
 			if(action === 'download') download(cloud);
 			else if(action === 'upload') await upload(cloud ? cloud.revision : null, false);
@@ -125,18 +133,18 @@
 			else { error = 'conflict'; pending = cloud; }
 		}
 		async function run(fn) {
-			if(busy) return;
+			if(suspended || busy) return;
 			busy = true; render();
 			try { await fn(); } catch(e) { fail(e); }
 			finally { busy = false; render(); showConflict(); }
 		}
 		function sync(keepalive) {
-			if(loggedOut) return;
+			if(suspended || loggedOut) return;
 			return run(async function() {
 				if(!user) {
 					var response = await request('/api/me');
 					if(!response.ok) throw new Error('offline');
-					user = await response.json(); meta = metadata(localStorage.getItem('kotoka.cloud'), user.uid);
+					user = await response.json(); meta = metadata(localStorage.getItem(metaKey), user.uid);
 				}
 				if(!ready) { if(!pending && !Engine.keyLock) await reconcile(); return; }
 				var state = local();
@@ -160,12 +168,14 @@
 		var interval = parseInterval(localStorage.getItem('kotoka.cloudInterval')), timer;
 		api.getInterval = function() { return interval; };
 		api.setInterval = function(minutes) {
+			if(suspended) return;
 			interval = parseInterval(minutes);
 			localStorage.setItem('kotoka.cloudInterval', String(interval));
 			clearInterval(timer);
 			timer = root.setInterval(function() { sync(false); }, interval * 60000);
 		};
 		api.status = function() { return { lastSync: lastSync || null, error: error, busy: busy }; };
+		api.suspend = function() { suspended = true; clearInterval(timer); pending = null; };
 		api.syncNow = function() { return sync(false); };
 		api.logout = function() { location.href = '/outpost.goauthentik.io/sign_out'; };
 		api.setInterval(interval);
