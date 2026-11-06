@@ -18,7 +18,7 @@ class APITest(unittest.TestCase):
         secret = Path(self.temp_path) / 'secret'
         secret.write_text(' secret \n')
         self.env = patch.dict(os.environ, ADR_DB_PATH=str(Path(self.temp_path) / 'db'),
-                              ADR_PROXY_SECRET_FILE=str(secret), ADR_KEEP_REVISIONS='3', ADR_MAX_BODY='512')
+                              ADR_PROXY_SECRET_FILE=str(secret), ADR_KEEP_REVISIONS='1', ADR_MAX_SLOTS='20', ADR_MAX_BODY='4096')
         self.env.start()
         self.server = create_server('127.0.0.1', 0)
         self.thread = threading.Thread(target=self.server.serve_forever)
@@ -67,31 +67,31 @@ class APITest(unittest.TestCase):
         self.assertEqual(self.put(1)[1], first[1])
         self.assertEqual(self.put(None)[1], dict(error='conflict', **first[1]))
         self.put(1, '{"x":2}')
-        self.assertEqual(self.request(path='/api/save?revision=1')[1]['state'], '{}')
+        self.assertEqual(self.request(path='/api/save?revision=1')[0], 404)
         for base in (2, 3, 4):
             self.assertEqual(self.put(base, json.dumps({'x': base + 1}))[0], 200)
-        self.assertEqual([x['revision'] for x in self.request(path='/api/saves')[1]['saves']], [5, 4, 3])
+        self.assertEqual([x['revision'] for x in self.request(path='/api/saves')[1]['saves']], [5])
         self.assertEqual(self.request(path='/api/save?revision=1')[0], 404)
         self.assertEqual(self.request(path='/api/save?revision=999')[0], 404)
         bob = {'X-Kotoka-Proxy-Secret': 'secret', 'X-Authentik-Uid': 'bob'}
         self.assertEqual(self.request(headers=bob)[0], 404)
         self.assertEqual(self.put(None, headers=bob)[1]['revision'], 1)
         self.assertEqual(self.request()[1]["revision"], 5)
-    def test_daily_snapshots_survive_pruning(self):
+    def test_older_days_pruned(self):
         with sqlite3.connect(os.environ['ADR_DB_PATH']) as db:
             for revision, day in ((1, '2026-01-01T10:00:00Z'), (2, '2026-01-01T11:00:00Z'),
                                   (3, '2026-01-02T09:00:00Z'), (4, '2026-01-02T09:30:00Z')):
                 db.execute('INSERT INTO saves VALUES (?, ?, ?, ?, ?)', ('alice', revision, day, 'Alice', '{"r":%d}' % revision))
         for base in (4, 5, 6, 7):
             self.assertEqual(self.put(base, json.dumps({'r': base + 1}))[0], 200)
-        self.assertEqual([x['revision'] for x in self.request(path='/api/saves')[1]['saves']], [8, 7, 6, 4, 2])
+        self.assertEqual([x['revision'] for x in self.request(path='/api/saves')[1]['saves']], [8])
 
     def test_invalid(self):
         for body in ('garbage', 'null', '[]', '{}', '{"baseRevision":null}', '{"baseRevision":true,"state":"{}"}'):
             self.assertEqual(self.request('PUT', body=body)[0], 400)
         for state in ('[]', 'null', '1', 'bad', '{"x":NaN}', 1, {}):
             self.assertEqual(self.put(None, state)[0], 400)
-        self.assertEqual(self.request('PUT', body='x' * 513)[0], 413)
+        self.assertEqual(self.request('PUT', body='x' * 4097)[0], 413)
         for revision in ('abc', '-1', '', '1&revision=2'):
             self.assertEqual(self.request(path='/api/save?revision=' + revision)[0], 400)
 
@@ -103,6 +103,68 @@ class APITest(unittest.TestCase):
             return self.put(1, json.dumps({'x': i}))[0]
         with concurrent.futures.ThreadPoolExecutor(2) as pool:
             self.assertEqual(sorted(pool.map(write, (1, 2))), [200, 409])
+
+    def put_slot(self, slot=1, state='{}', summary=None, headers=None):
+        return self.request('PUT', '/api/slots/' + str(slot),
+                            json.dumps(dict(state=state, summary={} if summary is None else summary)), headers)
+
+    def test_slots(self):
+        self.assertEqual(self.request(path='/api/slots')[1], {'slots': []})
+        first = self.put_slot()
+        self.assertEqual(first[0], 200)
+        self.assertEqual(first[1]['slot'], 1)
+        self.assertTrue(first[1]['updatedAt'].endswith('Z'))
+        state, summary = '{"wood":"木"}', {'wood': 123}
+        second = self.put_slot(state=state, summary=summary)
+        self.assertEqual(second[0], 200)
+        self.assertGreater(second[1]['updatedAt'], first[1]['updatedAt'])
+        self.assertEqual(self.request(path='/api/slots/1')[1], dict(second[1], state=state, summary=summary))
+        self.put_slot(20)
+        self.put_slot(3)
+        slots = self.request(path='/api/slots')[1]['slots']
+        self.assertEqual([s['slot'] for s in slots], [1, 3, 20])
+        self.assertEqual(slots[0], dict(second[1], size=len(state.encode('utf-8')), summary=summary))
+        self.assertEqual(self.request('DELETE', '/api/slots/1')[:2], (200, {'slot': 1, 'deleted': True}))
+        for method in ('GET', 'DELETE'):
+            self.assertEqual(self.request(method, '/api/slots/1')[:2], (404, {'error': 'empty slot'}))
+
+    def test_slots_invalid(self):
+        for slot in ('0', '21', 'abc', '1.5', '01x'):
+            for method in ('GET', 'PUT', 'DELETE'):
+                self.assertEqual(self.request(method, '/api/slots/' + slot)[:2], (404, {'error': 'no such slot'}))
+        for summary in ({'x': '木' * 342}, [], 'text', 1):
+            self.assertEqual(self.put_slot(summary=summary)[0], 400)
+        for state in ('[]', 'null', '1', 'bad', '{"x":NaN}', 1, {}):
+            self.assertEqual(self.put_slot(state=state)[0], 400)
+        for body in ('bad', 'null', '[]', '{}', '{"state":"{}"}', '{"state":"{}","summary":null}'):
+            self.assertEqual(self.request('PUT', '/api/slots/1', body)[0], 400)
+        self.assertEqual(self.request('PUT', '/api/slots/1', 'x' * 4097)[0], 413)
+        for path, methods in (('/api/slots', ('PUT', 'DELETE', 'POST', 'PATCH')),
+                              ('/api/slots/1', ('POST', 'PATCH', 'BOGUS'))):
+            for method in methods:
+                self.assertEqual(self.request(method, path)[0], 405)
+
+    def test_slots_isolation_auth(self):
+        bob = {'X-Kotoka-Proxy-Secret': 'secret', 'X-Authentik-Uid': 'bob'}
+        self.put_slot(state='{"alice":1}')
+        self.assertEqual(self.request(path='/api/slots', headers=bob)[1], {'slots': []})
+        for method in ('GET', 'DELETE'):
+            self.assertEqual(self.request(method, '/api/slots/1', headers=bob)[0], 404)
+        self.put_slot(headers=bob)
+        self.assertEqual(self.request(path='/api/slots/1')[1]['state'], '{"alice":1}')
+        before = self.request(path='/api/slots')[1]
+        self.assertEqual(self.request()[0], 404)
+        self.put(None)
+        self.put(1, '{"auto":2}')
+        self.assertEqual(self.request(path='/api/slots')[1], before)
+        auto = self.request()[1]
+        self.put_slot()
+        self.request('DELETE', '/api/slots/1')
+        self.assertEqual(self.request()[1], auto)
+        for path in ('/api/slots', '/api/slots/1'):
+            for method in ('GET', 'PUT', 'DELETE'):
+                for headers in ({}, {'X-Authentik-Uid': 'alice'}, {'X-Kotoka-Proxy-Secret': 'wrong', 'X-Authentik-Uid': 'alice'}):
+                    self.assertEqual(self.request(method, path, headers=headers)[0], 403)
 
     def test_secret_required(self):
         for value in ('', str(Path(self.temp_path) / 'missing')):

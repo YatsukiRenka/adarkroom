@@ -21,14 +21,17 @@ def create_server(host='0.0.0.0', port=None):
     if not secret:
         raise ValueError('Proxy secret must not be empty')
     db_path = os.environ.get('ADR_DB_PATH', '/data/saves.db')
-    keep = int(os.environ.get('ADR_KEEP_REVISIONS', '50'))
+    keep = int(os.environ.get('ADR_KEEP_REVISIONS', '1'))
+    max_slots = int(os.environ.get('ADR_MAX_SLOTS', '20'))
     max_body = int(os.environ.get('ADR_MAX_BODY', str(2 * 1024 * 1024)))
-    if keep < 1 or max_body < 1:
+    if keep < 1 or max_body < 1 or max_slots < 1:
         raise ValueError('Retention and body limit must be positive')
     with sqlite3.connect(db_path) as db:
         db.execute('PRAGMA journal_mode=WAL')
         db.execute('CREATE TABLE IF NOT EXISTS saves (uid TEXT, revision INTEGER, '
                    'updated_at TEXT, username TEXT, state TEXT, PRIMARY KEY(uid, revision))')
+        db.execute('CREATE TABLE IF NOT EXISTS slots (uid TEXT, slot INTEGER, '
+                   'updated_at TEXT, username TEXT, summary TEXT, state TEXT, PRIMARY KEY(uid, slot))')
 
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *args):
@@ -58,6 +61,17 @@ def create_server(host='0.0.0.0', port=None):
                 return self.reply(403, {'error': 'forbidden'})
             methods = {'/api/me': ('GET',), '/api/save': ('GET', 'PUT'),
                        '/api/saves': ('GET',), '/api/login': ('GET',), '/healthz': ('GET',)}
+            slot = None
+            if url.path == '/api/slots':
+                methods[url.path] = ('GET',)
+            elif url.path.startswith('/api/slots/'):
+                number = url.path[len('/api/slots/'):]
+                if not number.isascii() or not number.isdigit() or len(number) > 18:
+                    return self.reply(404, {'error': 'no such slot'})
+                slot = int(number)
+                if not 1 <= slot <= max_slots:
+                    return self.reply(404, {'error': 'no such slot'})
+                methods[url.path] = ('GET', 'PUT', 'DELETE')
             if url.path not in methods:
                 return self.reply(404, {'error': 'not found'})
             if self.command not in methods[url.path]:
@@ -69,6 +83,11 @@ def create_server(host='0.0.0.0', port=None):
                 return self.reply(302, {}, '/')
             db = sqlite3.connect(db_path, timeout=30)
             try:
+                if url.path == '/api/slots':
+                    rows = db.execute('SELECT slot, updated_at, summary, state FROM slots WHERE uid=? ORDER BY slot', (uid,))
+                    return self.reply(200, {'slots': [dict(slot=n, updatedAt=t, summary=json.loads(s), size=len(state.encode('utf-8'))) for n, t, s, state in rows]})
+                if slot is not None:
+                    return self.handle_slot(db, uid, username, slot)
                 if self.command == 'PUT':
                     return self.put_save(db, uid, username)
                 if url.path == '/api/saves':
@@ -90,22 +109,63 @@ def create_server(host='0.0.0.0', port=None):
             finally:
                 db.close()
 
+        def read_body(self):
+            length = int(self.headers.get('Content-Length', '-1'))
+            if length > max_body:
+                self.reply(413, {'error': 'body too large'})
+                return None
+            if length < 0 or self.headers.get('Transfer-Encoding'):
+                raise ValueError()
+            body = json.loads(self.rfile.read(length), parse_constant=reject_constant)
+            if not isinstance(body, dict):
+                raise ValueError()
+            state = body.get('state')
+            if not isinstance(state, str) or not isinstance(json.loads(state, parse_constant=reject_constant), dict):
+                raise ValueError()
+            state.encode('utf-8')
+            return body
+
+        def handle_slot(self, db, uid, username, slot):
+            if self.command == 'PUT':
+                try:
+                    body = self.read_body()
+                    if body is None:
+                        return
+                    if not isinstance(body.get('summary'), dict):
+                        raise ValueError()
+                    summary = json.dumps(body['summary'], ensure_ascii=False, separators=(',', ':'))
+                    if len(summary.encode('utf-8')) > 1024:
+                        raise ValueError()
+                except (ValueError, UnicodeError, RecursionError):
+                    return self.reply(400, {'error': 'invalid body'})
+                with db:
+                    db.execute('BEGIN IMMEDIATE')
+                    updated = datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
+                    db.execute('INSERT OR REPLACE INTO slots VALUES (?, ?, ?, ?, ?, ?)',
+                               (uid, slot, updated, username, summary, body['state']))
+                return self.reply(200, dict(slot=slot, updatedAt=updated))
+            if self.command == 'DELETE':
+                with db:
+                    db.execute('BEGIN IMMEDIATE')
+                    deleted = db.execute('DELETE FROM slots WHERE uid=? AND slot=?', (uid, slot)).rowcount
+                if not deleted:
+                    return self.reply(404, {'error': 'empty slot'})
+                return self.reply(200, dict(slot=slot, deleted=True))
+            row = db.execute('SELECT updated_at, summary, state FROM slots WHERE uid=? AND slot=?', (uid, slot)).fetchone()
+            if not row:
+                return self.reply(404, {'error': 'empty slot'})
+            return self.reply(200, dict(slot=slot, updatedAt=row[0], summary=json.loads(row[1]), state=row[2]))
+
         def put_save(self, db, uid, username):
             try:
-                length = int(self.headers.get('Content-Length', '-1'))
-                if length > max_body:
-                    return self.reply(413, {'error': 'body too large'})
-                if length < 0 or self.headers.get('Transfer-Encoding'):
-                    raise ValueError()
-                body = json.loads(self.rfile.read(length), parse_constant=reject_constant)
-                if not isinstance(body, dict) or 'baseRevision' not in body:
+                body = self.read_body()
+                if body is None:
+                    return
+                if 'baseRevision' not in body:
                     raise ValueError()
                 base, state = body['baseRevision'], body.get('state')
                 if base is not None and (type(base) is not int or base < 1):
                     raise ValueError()
-                if not isinstance(state, str) or not isinstance(json.loads(state, parse_constant=reject_constant), dict):
-                    raise ValueError()
-                state.encode('utf-8')
             except (ValueError, UnicodeError, RecursionError):
                 return self.reply(400, {'error': 'invalid body'})
             with db:
@@ -119,11 +179,7 @@ def create_server(host='0.0.0.0', port=None):
                     revision = current[0] + 1 if current else 1
                     updated = datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
                     db.execute('INSERT INTO saves VALUES (?, ?, ?, ?, ?)', (uid, revision, updated, username, state))
-                    # Keep the newest `keep` revisions plus the last revision of every UTC day,
-                    # so frequent auto-saves do not push older days out of the history.
-                    db.execute('DELETE FROM saves WHERE uid=? AND revision<=? AND revision NOT IN '
-                               '(SELECT MAX(revision) FROM saves WHERE uid=? GROUP BY substr(updated_at, 1, 10))',
-                               (uid, revision - keep, uid))
+                    db.execute('DELETE FROM saves WHERE uid=? AND revision<=?', (uid, revision - keep))
             return self.reply(200, dict(revision=revision, updatedAt=updated))
 
         def __getattr__(self, name):
