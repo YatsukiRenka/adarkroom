@@ -122,10 +122,12 @@
 		if(log && isNarrow()) log.style.backgroundColor = themeBackground();
 		var top = menuHeight(), bottom = logHeight();
 		var exploring = isDock() && typeof World !== 'undefined' && Engine.activeModule === World;
+		var fill = exploring && isNarrow();
+		fillWorld(fill, top, bottom);
 		body.style.paddingTop = top ? top + 'px' : '';
-		body.style.paddingBottom = exploring ? 'calc(60vh + ' + bottom + 'px)' : bottom ? bottom + 'px' : '';
+		body.style.paddingBottom = exploring && !fill ? 'calc(60vh + ' + bottom + 'px)' : bottom ? bottom + 'px' : '';
 		var map = document.getElementById('map');
-		if(!exploring || !map) return;
+		if(!exploring || fill || !map) return;
 
 		var avail = window.innerHeight - top - bottom, centre = top + avail / 2;
 		var box = map.getBoundingClientRect(), target = box;
@@ -138,6 +140,51 @@
 		var extra = Math.max(0, centre - docCentre);
 		body.style.paddingTop = (top + extra) + 'px';
 		window.scrollTo(window.scrollX, Math.max(0, docCentre + extra - centre));
+	}
+
+	// Portrait exploring: the world view (supplies, health, map) leaves the zoomed #wrapper and fills
+	// the area between dock and log at native size. World.drawMap/updateSupplies find these elements
+	// by id, so moving them keeps them working; they go back when the wanderer leaves the world.
+	var worldHome = null;
+
+	function fillWorld(on, top, bottom) {
+		var outer = document.getElementById('worldOuter');
+		if(!outer) return;
+		if(on) {
+			if(!worldHome) {
+				worldHome = outer.parentNode;
+				document.body.appendChild(outer);
+				outer.classList.add('kotoka-world-fill');
+			}
+			outer.style.top = top + 'px';
+			outer.style.bottom = bottom + 'px';
+			outer.style.backgroundColor = themeBackground();
+			sizeMap();
+		} else if(worldHome) {
+			outer.classList.remove('kotoka-world-fill');
+			outer.style.top = outer.style.bottom = outer.style.backgroundColor = '';
+			var map = document.getElementById('map');
+			if(map) map.style.fontSize = map.style.lineHeight = map.style.letterSpacing = '';
+			worldHome.appendChild(outer);
+			worldHome = null;
+		}
+	}
+
+	// Font size from the width (61 monospace columns), line height from the height (61 rows):
+	// the grid fills the area exactly and the glyphs are not distorted.
+	function sizeMap() {
+		var outer = document.getElementById('worldOuter'), map = document.getElementById('map');
+		if(!outer || !map || !worldHome) return;
+		var rows = World.RADIUS * 2 + 1, border = 2;
+		map.style.letterSpacing = '0px';
+		map.style.fontSize = '10px';
+		map.style.lineHeight = '10px';
+		var natural = map.getBoundingClientRect().width - border;
+		var box = outer.getBoundingClientRect(), style = getComputedStyle(outer);
+		var width = box.width - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight) - border;
+		var height = box.bottom - parseFloat(style.paddingBottom) - map.getBoundingClientRect().top - border;
+		if(natural > 0) map.style.fontSize = (10 * width / natural) + 'px';
+		map.style.lineHeight = Math.max(4, height / rows) + 'px';
 	}
 
 	function steer(e) {
@@ -203,7 +250,11 @@
 			return result;
 		};
 	}
-	if(typeof World !== 'undefined') after(World, 'drawMap', layout);
+	if(typeof World !== 'undefined') {
+		after(World, 'drawMap', layout);
+		// goHome switches Engine.activeModule directly, without Engine.travelTo
+		after(World, 'goHome', layout);
+	}
 	after(Engine, 'travelTo', function() { closeStepper(); setTimeout(layout, 350); });
 	after(Engine, 'turnLightsOff', layout);
 
@@ -211,6 +262,8 @@
 		addLanguageToggle();
 		fit();
 		$(window).on('resize orientationchange', fit);
+		var orientation = window.matchMedia('(orientation: landscape)');
+		if(orientation.addEventListener) orientation.addEventListener('change', fit);
 		var menu = document.querySelector('.menu');
 		if(menu && window.ResizeObserver) new ResizeObserver(layout).observe(menu);
 		var stores = document.getElementById('storesContainer');
@@ -221,6 +274,11 @@
 		$(document).on('click', '.workerRow, .outfitRow', function() {
 			if(isDock() && $(this).find('.upBtn').length) openStepper($(this));
 		});
+		// Safety net for any other way out of the world (death, events): restore the layout.
+		setInterval(function() {
+			var exploring = typeof World !== 'undefined' && Engine.activeModule === World;
+			if(worldHome && !exploring || !exploring && document.body.style.paddingBottom.indexOf('vh') >= 0) layout();
+		}, 500);
 		document.addEventListener('touchstart', steer, { passive: false });
 		document.addEventListener('touchmove', steer, { passive: false });
 		document.addEventListener('touchend', release);

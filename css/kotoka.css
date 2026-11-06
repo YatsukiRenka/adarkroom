@@ -147,6 +147,19 @@ body.kotoka-dock .menu > span:hover { text-decoration: none; }
 body.kotoka-dock .menu .customSelect { display: none; }
 body.kotoka-dock .menu .kotoka-lang { display: inline-block; }
 
+/* Portrait exploring: the world view fills the space between dock and log (mobile.js fillWorld). */
+#worldOuter.kotoka-world-fill {
+	position: fixed;
+	left: 0;
+	right: 0;
+	z-index: 15;
+	padding: 4px 8px 8px;
+	overflow: hidden;
+	font-size: 13px;
+}
+/* World.drawMap sets an inline width from the unscaled map; follow the screen instead */
+#worldOuter.kotoka-world-fill #bagspace-world { margin-top: 18px; height: auto; max-height: 4.2em; width: auto !important; }
+
 /* Stepper for rows with up/down arrows (script/kotoka/mobile.js). */
 #kotoka-stepper {
 	position: fixed;
