@@ -33,11 +33,11 @@
 	if(typeof module !== 'undefined' && module.exports) { module.exports = logic; return; }
 	root.Kotoka.addStrings({ zh_cn: {
 		'use hypo': '注射药剂', 'boost': '强化', 'shield': '护盾',
-		'hotkeys.': '快捷键.', 'attack 1': '攻击 1', 'attack 2': '攻击 2', 'attack 3': '攻击 3',
+		'hotkeys.': '快捷键.', 'Hotkeys': '快捷键', 'attack 1': '攻击 1', 'attack 2': '攻击 2', 'attack 3': '攻击 3',
 		'attack 4': '攻击 4', 'attack 5': '攻击 5', 'attack 6': '攻击 6',
-		'reset to defaults': '恢复默认', 'close': '关闭', 'unbound': '未绑定',
+		'reset to defaults': '恢复默认', 'unbound': '未绑定',
 		'press a key (Escape cancels; Backspace or Delete unbinds)': '请按键（Esc 取消，退格或 Delete 解除绑定）',
-		'hold a mouse button or key for 500 ms to toggle auto mode.': '长按鼠标按钮或按键 500 毫秒可切换自动模式。'
+		'hold a button or its hotkey for half a second to toggle auto mode.': '长按按钮或其快捷键半秒即可切换自动模式.'
 	} });
 	$(function() {
 		var raw;
@@ -68,11 +68,11 @@
 			if(panel) return;
 			cancelHolds();
 			previousFocus = document.activeElement;
-			panel = $('<div id="kotoka-hotkeys" role="dialog" aria-modal="true" tabindex="-1">').attr('aria-label', _('hotkeys.')).appendTo('body');
+			panel = $('<div id="kotoka-hotkeys" role="dialog" aria-modal="true" tabindex="-1">').attr('aria-label', _('Hotkeys')).appendTo('body');
 			var bg = $('body').css('background-color');
 			panel.css('background-color', /^(transparent|rgba\(0, 0, 0, 0\))$/.test(bg) ? '#fff' : bg);
-			$('<h2>').text(_('hotkeys.')).appendTo(panel);
-			$('<p>').text(_('hold a mouse button or key for 500 ms to toggle auto mode.')).appendTo(panel);
+			$('<h2>').text(_('Hotkeys')).appendTo(panel);
+			$('<p>').text(_('hold a button or its hotkey for half a second to toggle auto mode.')).appendTo(panel);
 			actions.forEach(function(a) {
 				var row = $('<button type="button" class="kotoka-key-row">').attr('data-action', a.id).appendTo(panel);
 				$('<span>').text(_(a.label)).appendTo(row);
