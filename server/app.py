@@ -84,6 +84,12 @@ def create_server(host='0.0.0.0', port=None):
                 return self.reply(200, {'uid': uid, 'username': username})
             if url.path == '/api/login':
                 return self.reply(302, {}, '/')
+            if url.path in ('/api/save', '/api/saves', '/api/slots') or slot is not None:
+                profile = self.headers.get('X-Kotoka-Profile', 'modded')
+                if profile not in ('modded', 'vanilla'):
+                    return self.reply(400, {'error': 'invalid profile'})
+                if profile == 'vanilla':
+                    uid += '#vanilla'
             db = sqlite3.connect(db_path, timeout=30)
             try:
                 if url.path == '/api/slots':
