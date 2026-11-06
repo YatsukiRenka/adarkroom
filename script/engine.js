@@ -392,9 +392,48 @@
       string64 = string64.replace(/\s/g, '');
       string64 = string64.replace(/\./g, '');
       string64 = string64.replace(/\n/g, '');
-      var decodedSave = Base64.decode(string64);
+      var decodedSave;
+      try {
+        decodedSave = string64.indexOf('ADR1:') === 0 ?
+          Engine.decodeADR1(string64.substring(5)) : Base64.decode(string64);
+        JSON.parse(decodedSave);
+      } catch(e) {
+        // Keep the current save instead of overwriting it with garbage.
+        alert(_('invalid save code.'));
+        return;
+      }
       localStorage.gameState = decodedSave;
       location.reload();
+    },
+
+    // "ADR1:" saves (exported by other A Dark Room sites) are base64 of an LZW
+    // code stream over the UTF-8 JSON: codes < 0x80 take one byte, larger codes
+    // two bytes (0x80 | code >> 8, code & 0xff).
+    decodeADR1: function(string64) {
+      var bin = atob(string64);
+      var codes = [];
+      for(var i = 0; i < bin.length; i++) {
+        var b = bin.charCodeAt(i);
+        codes.push(b < 0x80 ? b : ((b & 0x7f) << 8) | bin.charCodeAt(++i));
+      }
+      var dict = [];
+      for(var c = 0; c < 256; c++) {
+        dict.push([c]);
+      }
+      var w = dict[codes[0]];
+      var out = w.slice();
+      for(var j = 1; j < codes.length; j++) {
+        if(codes[j] > dict.length) {
+          throw new Error('bad ADR1 code');
+        }
+        var entry = codes[j] < dict.length ? dict[codes[j]] : w.concat(w[0]);
+        for(var k = 0; k < entry.length; k++) {
+          out.push(entry[k]);
+        }
+        dict.push(w.concat(entry[0]));
+        w = entry;
+      }
+      return new TextDecoder('utf-8', { fatal: true }).decode(new Uint8Array(out));
     },
 
     event: function(cat, act) {
