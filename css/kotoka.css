@@ -57,3 +57,14 @@ div.button[data-hotkey]:after {
 #kotoka-cloud-slots { padding: 25px max(20px, calc((100vw - 640px) / 2)); }
 #kotoka-cloud-slots .kotoka-slot-row button { margin: 0 0 0 4px; white-space: nowrap; }
 #kotoka-cloud-slots button:disabled { opacity: 0.5; cursor: default; }
+#kotoka-cloud-slots button[aria-pressed="true"] { font-weight: bold; text-decoration: underline; }
+#kotoka-cloud-slots .kotoka-slot-row { flex-wrap: wrap; gap: 8px; }
+#kotoka-cloud-slots .kotoka-slot-row > .kotoka-slot-info { display: block; flex-shrink: 1; }
+#kotoka-cloud-slots input {
+	font: inherit;
+	max-width: 100%;
+	color: inherit;
+	background: transparent;
+	border: 1px solid currentColor;
+	padding: 4px 6px;
+}
