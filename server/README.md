@@ -21,6 +21,17 @@ This includes committed WAL data in the resulting standalone SQLite file.
 
 ## Endpoints
 
+Send `X-Kotoka-Profile: modded` or `X-Kotoka-Profile: vanilla` on data requests.
+A missing header means `modded`, using existing data unchanged. Each user/profile
+has independent auto-save revisions, conflicts, retention, and manual slots (19 by
+default). Storage uses the existing tables with `uid` for modded and
+`uid + "#vanilla"` for vanilla; no schema change or migration is needed.
+On `/api/save`, `/api/saves`, `/api/slots`, and `/api/slots/N`, other header values
+(including empty or differently capitalized values) return 400
+`{"error":"invalid profile"}` before database access. Authentication is checked
+first and still returns 403 on failure. `/api/me`, `/api/login`, and `/healthz`
+ignore this header.
+
 - `GET /api/me`: authenticated user; `GET /api/login`: redirect to `/`.
 - `GET /healthz`: unauthenticated health check.
 - `GET /api/save`: newest auto-save, optional `?revision=N`.

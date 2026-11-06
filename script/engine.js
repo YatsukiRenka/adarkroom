@@ -575,12 +575,14 @@
       }
     },
 
+    MAX_SPEED: 3,
+
     getSpeed: function() {
-      return [1, 2, 3].includes(Engine.options.speed) ? Engine.options.speed : 1;
+      return Number.isInteger(Engine.options.speed) ? Math.max(1, Math.min(Engine.MAX_SPEED, Engine.options.speed)) : 1;
     },
 
     setSpeed: function(n) {
-      Engine.options.speed = [1, 2, 3].includes(n) ? n : 1;
+      Engine.options.speed = Number.isInteger(n) ? Math.max(1, Math.min(Engine.MAX_SPEED, n)) : 1;
       $SM.set('config.speed', Engine.getSpeed());
       $SM.set('config.hyperMode', Engine.getSpeed() > 1);
       $('.hyper').text(_('speed x{0}.', Engine.getSpeed()));
@@ -588,7 +590,7 @@
 
     confirmSpeed: function() {
       var buttons = {};
-      [1, 2, 3].forEach(function(n) {
+      Array.from({ length: Engine.MAX_SPEED }, function(_, i) { return i + 1; }).forEach(function(n) {
         buttons['speed' + n] = {
           text: _('x{0}', n),
           nextScene: 'end',

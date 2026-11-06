@@ -72,7 +72,7 @@
 			var bg = $('body').css('background-color');
 			panel.css('background-color', /^(transparent|rgba\(0, 0, 0, 0\))$/.test(bg) ? '#fff' : bg);
 			$('<h2>').text(_('Hotkeys')).appendTo(panel);
-			$('<p>').text(_('double-click a button or double-press its hotkey to toggle auto mode.')).appendTo(panel);
+			if(Kotoka.Mode.isModded()) $('<p>').text(_('double-click a button or double-press its hotkey to toggle auto mode.')).appendTo(panel);
 			actions.forEach(function(a) {
 				var row = $('<button type="button" class="kotoka-key-row">').attr('data-action', a.id).appendTo(panel);
 				$('<span>').text(_(a.label)).appendTo(row);
@@ -105,7 +105,7 @@
 			if(!btn.length) { tracking = null; return; }
 			block(e);
 			if(trackedButton !== btn[0]) tracking = null;
-			var result = Kotoka.autoRepeatDecision(tracking, btn.data('cooldown') > 0 ? e.code : null, Date.now(), Kotoka.AutoRepeat.isAuto(btn));
+			var result = Kotoka.autoRepeatDecision(tracking, btn.data('cooldown') > 0 ? e.code : null, Date.now(), Kotoka.AutoRepeat.isAuto(btn), Kotoka.Mode.isModded());
 			tracking = result.state;
 			trackedButton = btn[0];
 			if(result.action === 'pass') Kotoka.AutoRepeat.press(btn);

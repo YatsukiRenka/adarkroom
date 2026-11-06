@@ -222,6 +222,74 @@ class APITest(unittest.TestCase):
         with self.assertRaises(ValueError):
             create_server('127.0.0.1', 0)
 
+    def profile_headers(self, profile, uid='alice'):
+        return {'X-Kotoka-Proxy-Secret': 'secret', 'X-Authentik-Uid': uid,
+                'X-Authentik-Username': 'Alice', 'X-Kotoka-Profile': profile}
+
+    def test_modded_matches_default(self):
+        headers = self.profile_headers('modded')
+        self.put(None)
+        self.put_slot()
+        for path in ('/api/save', '/api/saves', '/api/slots', '/api/slots/1'):
+            self.assertEqual(self.request(path=path), self.request(path=path, headers=headers))
+        self.assertEqual(self.put(1, '{"new":1}', headers=headers)[1]['revision'], 2)
+        self.assertEqual(self.request()[1]['state'], '{"new":1}')
+        self.assertEqual(self.put_slot(name='Modded', headers=headers)[0], 200)
+        self.assertEqual(self.request(path='/api/slots/1')[1]['name'], 'Modded')
+
+    def test_profile_autosaves(self):
+        vanilla = self.profile_headers('vanilla')
+        bob = self.profile_headers('vanilla', 'bob')
+        for headers, state in ((None, '{"modded":1}'), (vanilla, '{"vanilla":1}'), (bob, '{"bob":1}')):
+            self.assertEqual(self.request(headers=headers)[0], 404)
+            self.assertEqual(self.put(None, state, headers=headers)[1]['revision'], 1)
+        self.assertEqual(self.put(1, '{"modded":2}')[1]['revision'], 2)
+        self.assertEqual(self.put(2, '{}', headers=vanilla)[0], 409)
+        self.assertEqual(self.put(1, '{"vanilla":2}', headers=vanilla)[1]['revision'], 2)
+        self.assertEqual(self.put(None, headers=bob)[1]['revision'], 1)
+        for headers, state, revision in ((None, '{"modded":2}', 2), (vanilla, '{"vanilla":2}', 2), (bob, '{"bob":1}', 1)):
+            self.assertEqual(self.request(headers=headers)[1]['state'], state)
+            self.assertEqual(self.request(path='/api/save?revision=' + str(revision), headers=headers)[1]['state'], state)
+            self.assertEqual([s['revision'] for s in self.request(path='/api/saves', headers=headers)[1]['saves']], [revision])
+        with sqlite3.connect(os.environ['ADR_DB_PATH']) as db:
+            self.assertEqual({r[0] for r in db.execute('SELECT uid FROM saves')},
+                             {'alice', 'alice#vanilla', 'bob#vanilla'})
+
+    def test_profile_slots(self):
+        profiles = (None, self.profile_headers('vanilla'), self.profile_headers('vanilla', 'bob'))
+        for index, headers in enumerate(profiles):
+            self.assertEqual(self.request(path='/api/slots', headers=headers)[1], {'slots': []})
+            self.assertEqual(self.put_slot(state=json.dumps({'owner': index}), headers=headers, create=True)[0], 200)
+            self.assertEqual(self.put_slot(headers=headers, create=True)[0], 409)
+            self.assertEqual(self.put_slot(index + 2, headers=headers)[0], 200)
+        for index, headers in enumerate(profiles):
+            self.assertEqual([s['slot'] for s in self.request(path='/api/slots', headers=headers)[1]['slots']], [1, index + 2])
+            self.assertEqual(self.request(path='/api/slots/1', headers=headers)[1]['state'], json.dumps({'owner': index}))
+        for index, headers in enumerate(profiles):
+            others = [(h, self.request(path='/api/slots/1', headers=h)) for i, h in enumerate(profiles) if i != index]
+            self.assertEqual(self.request('PATCH', '/api/slots/1', '{"name":"Renamed"}', headers)[0], 200)
+            self.assertEqual(self.request('DELETE', '/api/slots/1', headers=headers)[0], 200)
+            for other, before in others:
+                self.assertEqual(self.request(path='/api/slots/1', headers=other), before)
+
+    def test_invalid_profiles(self):
+        endpoints = (('/api/save', ('GET', 'PUT')), ('/api/saves', ('GET',)),
+                     ('/api/slots', ('GET',)), ('/api/slots/1', ('GET', 'PUT', 'PATCH', 'DELETE')))
+        for value in ('', 'Vanilla', 'other', 'x' * 10000):
+            headers = self.profile_headers(value)
+            with patch('app.sqlite3.connect') as connect:
+                for path, methods in endpoints:
+                    for method in methods:
+                        with self.subTest(value=value[:10], path=path, method=method):
+                            self.assertEqual(self.request(method, path, headers=headers)[:2], (400, {'error': 'invalid profile'}))
+                            bad_auth = dict(headers, **{'X-Kotoka-Proxy-Secret': 'wrong'})
+                            self.assertEqual(self.request(method, path, headers=bad_auth)[0], 403)
+                self.assertEqual(self.request(path='/api/me', headers=headers)[1], {'uid': 'alice', 'username': 'Alice'})
+                self.assertEqual(self.request(path='/api/login', headers=headers)[::2], (302, '/'))
+                self.assertEqual(self.request(path='/healthz', headers=headers)[:2], (200, 'ok'))
+                self.assertEqual(self.request(path='/unknown', headers=headers)[0], 404)
+                connect.assert_not_called()
+
 
 if __name__ == '__main__':
     unittest.main()
