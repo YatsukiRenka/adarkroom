@@ -1002,7 +1002,7 @@ var World = {
     redeem('glowstone blueprint', 'glowstone');
 
     if (redeemed) {
-      Notifications.notify(null, 'blueprints feed into the fabricator data port. possibilities grow.');
+      Notifications.notify(null, _('blueprints feed into the fabricator data port. possibilities grow.'));
     }
   },
 

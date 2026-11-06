@@ -239,7 +239,21 @@ const keys = [
   'disintegrate',
   'slice',
   'stun',
-  '{0}:{1}'
+  '{0}:{1}',
+  // item names shown through _(key) and text shown without _() upstream (missing-zh.py kinds item / raw)
+  'blueprints feed into the fabricator data port. possibilities grow.',
+  'disruptor blueprint',
+  'fleet beacon',
+  'glowstone',
+  'glowstone blueprint',
+  'hypo blueprint',
+  'kinetic armour blueprint',
+  'plasma rifle blueprint',
+  'stim blueprint',
+  'the air is running out.',
+  'the beacon glows a solid blue, and then goes dim. the ship slows.<br>gradually, the vast wanderer homefleet comes into view.<br>massive worldships drift unnaturally through clouds of debris, scarred and dead.',
+  'the beacon pulses gently as the ship glides through space.<br>coordinates are locked. nothing to do but wait.',
+  'the capsule is cold.'
 ];
 let calls = 0;
 let translations;

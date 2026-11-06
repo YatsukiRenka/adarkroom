@@ -30,7 +30,7 @@ A Dark Room（kotoka 魔改版）
 ## 语言与清理
 
 - 语言只保留简体中文和英文，默认简体中文；手机等窄屏上菜单中提供 English / 中文 一键切换。
-- 补全原版中文翻译缺失的 235 条文本（处刑者终局、制造器、部分遭遇战等）。
+- 补全原版中文翻译缺失的 248 条文本（处刑者终局、制造器、蓝图与舰队信标结局、部分遭遇战等）；原版中几处未接入翻译的文本（蓝图兑换提示、舰队信标结局）改为可翻译。
 - 菜单「关于」中注明本版本为非官方魔改版，列出原作者、开源协议、商标声明，以及源代码地址。
 - jQuery 改为本地加载；移除 Google Analytics、左下角官网链接、应用商店 / 分享 / GitHub 菜单项，以及 Penrose 推广事件。
 
@@ -68,7 +68,7 @@ A Dark Room（kotoka 魔改版）
 for t in tools/kotoka/test-*.js; do node "$t"; done
 # 云存档服务测试
 cd server && python -m unittest
-# 检查是否还有未翻译成中文的文本（应输出 missing: 0）
+# 检查是否还有未翻译成中文的文本，包括以物品名作键的掉落/配方，以及未经 _() 直接显示的英文（应输出 missing: 0）
 python tools/kotoka/missing-zh.py . /tmp/missing-zh.json
 # 本地运行：先启动 server/app.py，再启动开发服务器（模拟已登录用户）
 python tools/kotoka/dev-server.py --uid dev --username dev --secret-file <密钥文件>

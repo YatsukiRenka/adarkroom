@@ -236,6 +236,12 @@ Kotoka.addStrings({ zh_cn: {
   'kinetic': '动能',
   'perks': '能力',
   // script/space.js
+  'the air is running out.': '空气快要耗尽了.',
+  'the beacon glows a solid blue, and then goes dim. the ship slows.<br>gradually, the vast wanderer homefleet comes into view.<br>massive worldships drift unnaturally through clouds of debris, scarred and dead.':
+    '信标亮起稳定的蓝光，随即暗了下去. 飞船慢了下来.<br>庞大的流浪者母舰队渐渐映入眼帘.<br>巨大的世界舰在残骸云中不自然地漂浮，伤痕累累，了无生机.',
+  'the beacon pulses gently as the ship glides through space.<br>coordinates are locked. nothing to do but wait.':
+    '飞船在太空中滑行，信标轻轻地脉动着.<br>坐标已锁定. 除了等待，别无他事.',
+  'the capsule is cold.': '舱内一片冰冷.',
   'wait': '等待',
   // script/world.js
   'A&nbsp;Ravaged&nbsp;Battleship': '残破战舰',
@@ -244,4 +250,14 @@ Kotoka.addStrings({ zh_cn: {
   'slice': '切割',
   'stun': '击晕',
   '{0}:{1}': '{0}:{1}',
+  'blueprints feed into the fabricator data port. possibilities grow.': '蓝图送入了制造机的数据端口. 可造之物又多了.',
+  // item keys shown through _(key): loot, stores, outfit, fabricator blueprint list
+  'disruptor blueprint': '干扰器蓝图',
+  'fleet beacon': '舰队信标',
+  'glowstone': '发光石',
+  'glowstone blueprint': '发光石蓝图',
+  'hypo blueprint': '注射剂蓝图',
+  'kinetic armour blueprint': '动能护甲蓝图',
+  'plasma rifle blueprint': '等离子步枪蓝图',
+  'stim blueprint': '兴奋剂蓝图',
 } });
