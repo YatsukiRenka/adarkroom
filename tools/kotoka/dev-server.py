@@ -57,6 +57,9 @@ def main():
                            'X-Kotoka-Proxy-Secret': secret}
                 body = self.rfile.read(int(self.headers.get('Content-Length', '0')))
                 headers['Content-Type'] = self.headers.get('Content-Type', 'application/json')
+                # client headers nginx would pass through unchanged
+                if self.headers.get('X-Kotoka-Profile') is not None:
+                    headers['X-Kotoka-Profile'] = self.headers['X-Kotoka-Profile']
                 connection_type = http.client.HTTPSConnection if backend.scheme == 'https' else http.client.HTTPConnection
                 conn = connection_type(backend.hostname, backend.port, timeout=30)
                 try:

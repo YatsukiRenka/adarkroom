@@ -577,6 +577,18 @@
 
     MAX_SPEED: 3,
 
+    // kotoka.club: fights run at normal speed whatever the speed setting; the game clock
+    // (Engine.setTimeout/setInterval, button cooldowns) uses timeScale(), not getSpeed().
+    inCombat: function() {
+      var event = typeof Events !== 'undefined' && Events.activeEvent && Events.activeEvent();
+      var scene = event && event.scenes && event.scenes[Events.activeScene];
+      return !!(scene && scene.combat);
+    },
+
+    timeScale: function() {
+      return Engine.inCombat() ? 1 : Engine.getSpeed();
+    },
+
     getSpeed: function() {
       return Number.isInteger(Engine.options.speed) ? Math.max(1, Math.min(Engine.MAX_SPEED, Engine.options.speed)) : 1;
     },
@@ -871,7 +883,7 @@
 
     setInterval: function(callback, interval, skipDouble){
       if(!skipDouble){
-        interval /= Engine.getSpeed();
+        interval /= Engine.timeScale();
       }
 
       return setInterval(callback, interval);
@@ -881,7 +893,7 @@
     setTimeout: function(callback, timeout, skipDouble){
 
       if(!skipDouble){
-        timeout /= Engine.getSpeed();
+        timeout /= Engine.timeScale();
       }
 
       return setTimeout(callback, timeout);

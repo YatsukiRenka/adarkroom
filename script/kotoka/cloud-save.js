@@ -156,10 +156,11 @@
 			if(Engine.keyLock) return;
 			Kotoka.CloudSlots.open();
 		});
-		// Upstream restart clears all of localStorage; keep this site's settings (hotkeys, cloud sync baseline).
+		// Upstream restart clears all of localStorage; keep this site's settings (hotkeys, cloud sync
+		// baseline, the other mode's save) and the chosen language.
 		var deleteSave = Engine.deleteSave;
 		Engine.deleteSave = function(noReload) {
-			var keep = Object.keys(localStorage).filter(function(k) { return k.indexOf('kotoka.') === 0; })
+			var keep = Object.keys(localStorage).filter(function(k) { return k.indexOf('kotoka.') === 0 || k === 'lang'; })
 				.map(function(k) { return [k, localStorage.getItem(k)]; });
 			deleteSave.call(Engine, true);
 			keep.forEach(function(kv) { localStorage.setItem(kv[0], kv[1]); });
