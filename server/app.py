@@ -119,7 +119,11 @@ def create_server(host='0.0.0.0', port=None):
                     revision = current[0] + 1 if current else 1
                     updated = datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
                     db.execute('INSERT INTO saves VALUES (?, ?, ?, ?, ?)', (uid, revision, updated, username, state))
-                    db.execute('DELETE FROM saves WHERE uid=? AND revision<=?', (uid, revision - keep))
+                    # Keep the newest `keep` revisions plus the last revision of every UTC day,
+                    # so frequent auto-saves do not push older days out of the history.
+                    db.execute('DELETE FROM saves WHERE uid=? AND revision<=? AND revision NOT IN '
+                               '(SELECT MAX(revision) FROM saves WHERE uid=? GROUP BY substr(updated_at, 1, 10))',
+                               (uid, revision - keep, uid))
             return self.reply(200, dict(revision=revision, updatedAt=updated))
 
         def __getattr__(self, name):

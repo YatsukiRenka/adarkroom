@@ -31,6 +31,15 @@ assert.strictEqual(decision({ local: '{broken', cloud: null }), 'upload');
 assert.strictEqual(decision({ cloud: '{broken' }), 'conflict');
 assert.strictEqual(decision({ cloud: {} }), 'conflict');
 assert.strictEqual(decision({ local: '', meta: null }), 'conflict');
+// brand-new local game on a new browser takes the cloud save silently
+const fresh = '{"features":{"location":{"room":true}},"game":{"fire":{"value":0}}}';
+assert.strictEqual(decision({ local: fresh, meta: null }), 'download');
+assert.strictEqual(decision({ local: '{"stores":{}}', meta: null }), 'download');
+assert.strictEqual(decision({ local: fresh, uid: 'b' }), 'download');
+// after a deliberate restart (sync baseline kept) the new game replaces the cloud save
+assert.strictEqual(decision({ local: fresh }), 'upload');
+assert.strictEqual(decision({ local: '[]', meta: null }), 'conflict');
+assert.strictEqual(decision({ local: 'null', meta: null }), 'conflict');
 assert.deepStrictEqual(logic.summary('{broken'), { wood: null, huts: null, population: null });
 assert.deepStrictEqual(logic.summary('null'), { wood: null, huts: null, population: null });
 assert.deepStrictEqual(logic.summary('{}'), { wood: null, huts: null, population: null });

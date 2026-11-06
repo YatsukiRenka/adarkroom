@@ -29,7 +29,13 @@
 		if(!Number.isInteger(cloud.revision) || typeof cloud.state !== 'string') return 'conflict';
 		if(local == null) return 'download';
 		if(meta && meta.revision === cloud.revision) return hash(local) === meta.hash ? 'synced' : 'upload';
-		return hash(local) === hash(cloud.state) ? 'adopt' : 'conflict';
+		if(hash(local) === hash(cloud.state)) return 'adopt';
+		// A brand-new game (nothing in stores yet) on a new browser: take the cloud save without asking.
+		return pristine(local) ? 'download' : 'conflict';
+	}
+	function pristine(raw) {
+		var s = parse(raw);
+		return !!s && typeof s === 'object' && !Array.isArray(s) && (!s.stores || Object.keys(s.stores).length === 0);
 	}
 	function summary(raw) {
 		var s = parse(raw) || {}, game = s.game || {}, buildings = game.buildings || {}, stores = s.stores || {};

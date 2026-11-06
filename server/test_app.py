@@ -1,6 +1,7 @@
 import concurrent.futures
 import http.client
 import json
+import sqlite3
 import os
 from pathlib import Path
 import tempfile
@@ -76,6 +77,15 @@ class APITest(unittest.TestCase):
         self.assertEqual(self.request(headers=bob)[0], 404)
         self.assertEqual(self.put(None, headers=bob)[1]['revision'], 1)
         self.assertEqual(self.request()[1]["revision"], 5)
+    def test_daily_snapshots_survive_pruning(self):
+        with sqlite3.connect(os.environ['ADR_DB_PATH']) as db:
+            for revision, day in ((1, '2026-01-01T10:00:00Z'), (2, '2026-01-01T11:00:00Z'),
+                                  (3, '2026-01-02T09:00:00Z'), (4, '2026-01-02T09:30:00Z')):
+                db.execute('INSERT INTO saves VALUES (?, ?, ?, ?, ?)', ('alice', revision, day, 'Alice', '{"r":%d}' % revision))
+        for base in (4, 5, 6, 7):
+            self.assertEqual(self.put(base, json.dumps({'r': base + 1}))[0], 200)
+        self.assertEqual([x['revision'] for x in self.request(path='/api/saves')[1]['saves']], [8, 7, 6, 4, 2])
+
     def test_invalid(self):
         for body in ('garbage', 'null', '[]', '{}', '{"baseRevision":null}', '{"baseRevision":true,"state":"{}"}'):
             self.assertEqual(self.request('PUT', body=body)[0], 400)
