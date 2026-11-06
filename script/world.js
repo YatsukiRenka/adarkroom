@@ -430,12 +430,13 @@ var World = {
   },
 
   click: function(event) {
-    var map = $('#map'),
-      // measure clicks relative to the centre of the current location
-      centreX = map.offset().left + map.width() * World.curPos[0] / (World.RADIUS * 2),
-      centreY = map.offset().top + map.height() * World.curPos[1] / (World.RADIUS * 2),
-      clickX = event.pageX - centreX,
-      clickY = event.pageY - centreY;
+    // measure clicks relative to the centre of the current location; use the rendered box so
+    // this stays correct when the page is scaled with CSS zoom (narrow screens)
+    var box = $('#map')[0].getBoundingClientRect(),
+      centreX = box.left + box.width * World.curPos[0] / (World.RADIUS * 2),
+      centreY = box.top + box.height * World.curPos[1] / (World.RADIUS * 2),
+      clickX = event.clientX - centreX,
+      clickY = event.clientY - centreY;
     if (clickX > clickY && clickX < -clickY) {
       World.moveNorth();
     }

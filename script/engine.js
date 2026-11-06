@@ -91,10 +91,7 @@
         window.location = 'browserWarning.html';
       }
 
-      // Check for mobile
-      if(Engine.isMobile()) {
-        window.location = 'mobileWarning.html';
-      }
+      // kotoka.club: no redirect to the app stores on mobile; script/kotoka/mobile.js adapts the layout.
 
       Engine.disableSelection();
 

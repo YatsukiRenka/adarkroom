@@ -68,3 +68,48 @@ div.button[data-hotkey]:after {
 	border: 1px solid currentColor;
 	padding: 4px 6px;
 }
+
+/* Touch: no double-tap zoom on game controls (double-tap toggles auto mode). */
+div.button, .menu span { touch-action: manipulation; }
+
+/* Narrow screens: body.kotoka-narrow and --kotoka-zoom are set by script/kotoka/mobile.js. */
+body.kotoka-narrow { overflow-x: hidden; }
+body.kotoka-narrow div#wrapper {
+	zoom: var(--kotoka-zoom, 1);
+	width: 700px;
+	margin: 0;
+	padding: 8px;
+	display: flex;
+	flex-direction: column;
+}
+body.kotoka-narrow div#notifications {
+	order: -1;
+	position: relative;
+	top: 0;
+	left: 0;
+	width: 700px;
+	height: 72px;
+	margin-bottom: 8px;
+	overflow: hidden;
+}
+body.kotoka-narrow div#content { flex: none; }
+body.kotoka-narrow .eventPanel { left: 162px; top: 170px; }
+body.kotoka-narrow .eventPanel:before { left: -164px; width: 700px; }
+body.kotoka-narrow .menu {
+	position: relative;
+	right: auto;
+	bottom: auto;
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: center;
+	gap: 4px 16px;
+	align-items: center;
+	padding: 12px 8px 20px;
+}
+body.kotoka-narrow .menu span { float: none; margin: 0; line-height: 1.8; }
+body.kotoka-narrow .menu .customSelect { position: relative; display: inline-block; width: 120px; height: 1.8em; }
+@media (max-width: 600px) {
+	#kotoka-cloud-slots .kotoka-slot-row { flex-wrap: wrap; }
+	#kotoka-cloud-slots .kotoka-slot-row > .kotoka-slot-info { flex-basis: 100%; }
+	#kotoka-hotkeys .kotoka-key-row { gap: 8px; }
+}
