@@ -394,21 +394,18 @@ var World = {
   },
 
   keyDown: function(event) {
-    switch(event.which) {
-      case 38: // Up
-      case 87:
+    if(Engine.ignoreKey(event)) return;
+    switch(Engine.keyDirection(event)) {
+      case 'up':
         World.moveNorth();
         break;
-      case 40: // Down
-      case 83:
+      case 'down':
         World.moveSouth();
         break;
-      case 37: // Left
-      case 65:
+      case 'left':
         World.moveWest();
         break;
-      case 39: // Right
-      case 68:
+      case 'right':
         World.moveEast();
         break;
       default:
