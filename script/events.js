@@ -181,19 +181,19 @@ var Events = {
 		fighter.data('status', status);
 		if (status === 'enraged' && fighter.attr('id') === 'enemy') {
 			Events.startEnemyAttacks(0.5);
-			setTimeout(() => {
+			Engine.setTimeout(() => {
 				fighter.data('status', 'none');
 				Events.startEnemyAttacks();
 			}, Events.ENRAGE_DURATION);
 		}
 		if (status === 'meditation') {
 			Events._meditateDmg = 0;
-			setTimeout(() => {
+			Engine.setTimeout(() => {
 				fighter.data('status', 'none');
 			}, Events.MEDITATE_DURATION);
 		}
 		if (status === 'boost') {
-			setTimeout(() => {
+			Engine.setTimeout(() => {
 				fighter.data('status', 'none');
 			}, Events.BOOST_DURATION);
 		}
@@ -583,7 +583,7 @@ var Events = {
 	explode: (enemy, player, dmg) => {
 		Events.clearTimeouts();
 		enemy.addClass('exploding');
-		setTimeout(() => {
+		Engine.setTimeout(() => {
 			enemy.removeClass('exploding');
 			$('.label', enemy).text('*');
 			Events.damage(enemy, player, dmg, 'ranged', () => {
@@ -643,7 +643,7 @@ var Events = {
 
 				if (venomous && !shielded) {
 					clearInterval(Events._dotTimer);
-					Events._dotTimer = setInterval(() => {
+					Events._dotTimer = Engine.setInterval(() => {
 						Events.dotDamage(enemy, Math.floor(dmg / 2));
 					}, Events.DOT_TICK);
 				}
@@ -673,7 +673,7 @@ var Events = {
 			if(dmg == 'stun') {
 				msg = _('stunned');
 				enemy.data('stunned', true);
-				setTimeout(() => enemy.data('stunned', false), Events.STUN_DURATION);
+				Engine.setTimeout(() => enemy.data('stunned', false), Events.STUN_DURATION);
 			}
 		}
 
