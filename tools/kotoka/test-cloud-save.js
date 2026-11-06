@@ -46,3 +46,6 @@ assert.deepStrictEqual(logic.summary('{}'), { wood: null, huts: null, population
 assert.deepStrictEqual(logic.summary('{"stores":{"wood":0},"game":{"buildings":{"hut":4},"population":9}}'), { wood: 0, huts: 4, population: 9 });
 assert.deepStrictEqual(logic.summary('{"stores":{"wood":"bad"},"game":{"buildings":null}}'), { wood: null, huts: null, population: null });
 console.log('cloud-save decision and summary tests passed');
+
+['1', '5', '10'].forEach(v => assert.equal(logic.parseInterval(v), Number(v)));
+[null, undefined, '', '2', '01', ' 5 ', '5.0', 'bad'].forEach(v => assert.equal(logic.parseInterval(v), 1));

@@ -10,6 +10,7 @@
 		'this browser — wood: {0}, huts: {1}, population: {2}': '此浏览器——木头：{0}，小屋：{1}，人口：{2}',
 		'choose which save to keep.': '请选择要保留的存档.'
 	} });
+	function parseInterval(value) { return /^(1|5|10)$/.test(String(value)) ? Number(value) : 1; }
 	function parse(value) {
 		try { return typeof value === 'string' ? JSON.parse(value) : value; } catch(e) { return null; }
 	}
@@ -47,7 +48,7 @@
 		Engine.saveGame = function() {};
 		location.reload();
 	}
-	var api = { replaceLocalSave: replaceLocalSave, hash: hash, decide: decide, summary: summary, metadata: metadata };
+	var api = { parseInterval: parseInterval, replaceLocalSave: replaceLocalSave, hash: hash, decide: decide, summary: summary, metadata: metadata };
 	if(typeof module !== 'undefined' && module.exports) { module.exports = api; return; }
 	root.Kotoka.CloudSave = api;
 	$(function() {
@@ -91,7 +92,8 @@
 			return _(label, s.wood == null ? _('unknown') : s.wood, s.huts == null ? _('unknown') : s.huts, s.population == null ? _('unknown') : s.population);
 		}
 		function showConflict() {
-			if(!pending || Engine.keyLock || busy) return;
+			// Wait while the cloud window covers the screen; the dialog would be hidden under it.
+			if(!pending || Engine.keyLock || busy || document.getElementById('kotoka-cloud-slots')) return;
 			var cloud = pending; pending = null;
 			var date = new Date(cloud.updatedAt);
 			dialog([_('choose which save to keep.'), _('cloud updated: {0}', isNaN(date.getTime()) ? _('unknown') : date.toLocaleString()),
@@ -144,12 +146,7 @@
 		menu.on('click', function() {
 			if(!user) { location.href = '/api/login'; return; }
 			if(Engine.keyLock) return;
-			if(pending) { showConflict(); return; }
-			var time = lastSync && (String(lastSync.getHours()).padStart(2, '0') + ':' + String(lastSync.getMinutes()).padStart(2, '0'));
-			dialog([error ? _(error) : time ? _('last synced: {0}', time) : _('not synced yet')], {
-				sync: button('sync now', function() { setTimeout(function() { sync(false); }, 0); }),
-				logout: button('log out', function() { location.href = '/outpost.goauthentik.io/sign_out'; }), close: button('close')
-			});
+			Kotoka.CloudSlots.open();
 		});
 		// Upstream restart clears all of localStorage; keep this site's settings (hotkeys, cloud sync baseline).
 		var deleteSave = Engine.deleteSave;
@@ -160,7 +157,18 @@
 			keep.forEach(function(kv) { localStorage.setItem(kv[0], kv[1]); });
 			if(!noReload) location.reload();
 		};
-		setInterval(function() { sync(false); }, 60000);
+		var interval = parseInterval(localStorage.getItem('kotoka.cloudInterval')), timer;
+		api.getInterval = function() { return interval; };
+		api.setInterval = function(minutes) {
+			interval = parseInterval(minutes);
+			localStorage.setItem('kotoka.cloudInterval', String(interval));
+			clearInterval(timer);
+			timer = root.setInterval(function() { sync(false); }, interval * 60000);
+		};
+		api.status = function() { return { lastSync: lastSync || null, error: error, busy: busy }; };
+		api.syncNow = function() { return sync(false); };
+		api.logout = function() { location.href = '/outpost.goauthentik.io/sign_out'; };
+		api.setInterval(interval);
 		setInterval(showConflict, 1000);
 		document.addEventListener('visibilitychange', function() { if(document.hidden) sync(false); });
 		root.addEventListener('pagehide', function() { sync(true); });

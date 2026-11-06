@@ -290,7 +290,7 @@
             buttons: {
               ...(window.Kotoka && Kotoka.CloudSave && Kotoka.CloudSave.isLoggedIn() ? {
                 cloudSlots: {
-                  text: _('cloud slots'), nextScene: 'end',
+                  text: _('cloud saves'), nextScene: 'end',
                   onChoose: function() { setTimeout(function() { Kotoka.CloudSlots.open(); }, 0); }
                 }
               } : {}),
